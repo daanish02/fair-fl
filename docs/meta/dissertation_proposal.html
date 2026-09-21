@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dissertation Proposal — Fair FL</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--font-sans, system-ui, sans-serif);
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--text-primary, #0b0b0b);
+        background: transparent;
+        padding: 1.5rem 1rem 3rem;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-size: 21px;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      h2 {
+        font-size: 16px;
+        font-weight: 500;
+        margin: 2.2rem 0 0.8rem;
+      }
+      .eyebrow {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-muted, #898781);
+        margin-bottom: 1.5rem;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 1.2rem 0 2rem;
+      }
+      .nav-btn {
+        font-size: 12px;
+        padding: 5px 13px;
+        border-radius: 20px;
+        border: 0.5px solid var(--border-strong, rgba(11, 11, 11, 0.2));
+        color: var(--text-secondary, #52514e);
+        background: var(--surface-1, #fcfcfb);
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .nav-btn:hover {
+        background: var(--surface-0, #f5f4f0);
+      }
+      .nav-btn.active {
+        background: #2a78d6;
+        color: #fff;
+        border-color: #2a78d6;
+      }
+
+      .section {
+        display: none;
+      }
+      .section.visible {
+        display: block;
+      }
+
+      /* Cards */
+      .card {
+        background: var(--surface-1, #fcfcfb);
+        border: 0.5px solid var(--border, rgba(11, 11, 11, 0.1));
+        border-radius: 12px;
+        padding: 1.1rem 1.25rem;
+        margin-bottom: 12px;
+      }
+      .card-accent {
+        border-left: 3px solid #2a78d6;
+      }
+      .card-amber {
+        border-left: 3px solid #eda100;
+      }
+      .card-teal {
+        border-left: 3px solid #1baf7a;
+      }
+      .card-purple {
+        border-left: 3px solid #6250d6;
+      }
+      .card-coral {
+        border-left: 3px solid #eb6834;
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 5px;
+      }
+      .card-sub {
+        font-size: 12px;
+        color: var(--text-muted, #898781);
+        margin-bottom: 8px;
+      }
+      .card-body {
+        font-size: 13px;
+        color: var(--text-secondary, #52514e);
+        line-height: 1.65;
+      }
+
+      /* Tags */
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+      .tag-blue {
+        background: #e6f1fb;
+        color: #0c447c;
+      }
+      .tag-green {
+        background: #e1f5ee;
+        color: #085041;
+      }
+      .tag-amber {
+        background: #faeeda;
+        color: #633806;
+      }
+      .tag-purple {
+        background: #eeedfe;
+        color: #26215c;
+      }
+      .tag-coral {
+        background: #faece7;
+        color: #993c1d;
+      }
+      .tag-gray {
+        background: var(--surface-0, #f1f0e8);
+        color: var(--text-secondary, #52514e);
+      }
+
+      /* Grid */
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+        margin-bottom: 1rem;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 1rem;
+      }
+
+      /* Problem statement box */
+      .problem-box {
+        background: var(--surface-1, #fcfcfb);
+        border: 0.5px solid var(--border, rgba(11, 11, 11, 0.1));
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .problem-q {
+        font-size: 15px;
+        font-weight: 500;
+        color: #2a78d6;
+        margin-bottom: 10px;
+      }
+      .problem-a {
+        font-size: 13px;
+        color: var(--text-secondary, #52514e);
+        line-height: 1.7;
+      }
+
+      /* Conversation script */
+      .script-block {
+        margin-bottom: 1.2rem;
+      }
+      .speaker {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-muted, #898781);
+        margin-bottom: 4px;
+      }
+      .you {
+        border-left: 3px solid #2a78d6;
+        padding: 10px 14px;
+        background: var(--surface-1, #fcfcfb);
+        border-radius: 0 8px 8px 0;
+        font-size: 13px;
+        color: var(--text-secondary, #52514e);
+        line-height: 1.65;
+      }
+      .prof {
+        border-left: 3px solid #eda100;
+        padding: 10px 14px;
+        background: var(--surface-1, #fcfcfb);
+        border-radius: 0 8px 8px 0;
+        font-size: 13px;
+        color: var(--text-secondary, #52514e);
+        line-height: 1.65;
+        font-style: italic;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--text-muted, #898781);
+        padding: 6px 14px;
+        margin-bottom: 8px;
+      }
+
+      /* Timeline */
+      .tl {
+        margin: 0;
+      }
+      .tl-item {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 1rem;
+        align-items: flex-start;
+      }
+      .tl-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 500;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .dot-blue {
+        background: #e6f1fb;
+        color: #0c447c;
+      }
+      .dot-green {
+        background: #e1f5ee;
+        color: #085041;
+      }
+      .dot-amber {
+        background: #faeeda;
+        color: #633806;
+      }
+      .tl-body {
+        flex: 1;
+      }
+      .tl-title {
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 3px;
+      }
+      .tl-desc {
+        font-size: 12px;
+        color: var(--text-secondary, #52514e);
+        line-height: 1.55;
+      }
+
+      /* Metric row */
+      .metric-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 1.2rem;
+      }
+      .metric {
+        background: var(--surface-1, #fcfcfb);
+        border: 0.5px solid var(--border, rgba(11, 11, 11, 0.1));
+        border-radius: 10px;
+        padding: 0.8rem 1rem;
+        flex: 1;
+        min-width: 130px;
+      }
+      .metric-val {
+        font-size: 20px;
+        font-weight: 500;
+        color: var(--text-primary, #0b0b0b);
+      }
+      .metric-label {
+        font-size: 11px;
+        color: var(--text-muted, #898781);
+        margin-top: 2px;
+      }
+
+      /* Comparison table */
+      .comp-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        margin-bottom: 1rem;
+      }
+      .comp-table th {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 0.5px solid var(--border-strong, rgba(11, 11, 11, 0.2));
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted, #898781);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .comp-table td {
+        padding: 8px 10px;
+        border-bottom: 0.5px solid var(--border, rgba(11, 11, 11, 0.1));
+        color: var(--text-secondary, #52514e);
+        vertical-align: top;
+        line-height: 1.5;
+      }
+      .comp-table tr:last-child td {
+        border-bottom: none;
+      }
+      .comp-table .yours {
+        background: #e6f1fb22;
+      }
+      .check {
+        color: #1baf7a;
+        font-weight: 500;
+      }
+      .cross {
+        color: #e24b4a;
+      }
+      .partial {
+        color: #eda100;
+      }
+
+      hr {
+        border: none;
+        border-top: 0.5px solid var(--border, rgba(11, 11, 11, 0.1));
+        margin: 2rem 0;
+      }
+      p.note-text {
+        font-size: 12px;
+        color: var(--text-muted, #898781);
+        margin-top: 1rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .tag-blue {
+          background: #0c447c;
+          color: #b5d4f4;
+        }
+        .tag-green {
+          background: #085041;
+          color: #9fe1cb;
+        }
+        .tag-amber {
+          background: #412402;
+          color: #fac775;
+        }
+        .tag-purple {
+          background: #26215c;
+          color: #cecbf6;
+        }
+        .tag-coral {
+          background: #4a1b0c;
+          color: #f0997b;
+        }
+        .dot-blue {
+          background: #0c447c;
+          color: #b5d4f4;
+        }
+        .dot-green {
+          background: #085041;
+          color: #9fe1cb;
+        }
+        .dot-amber {
+          background: #412402;
+          color: #fac775;
+        }
+        .nav-btn.active {
+          background: #185fa5;
+          border-color: #185fa5;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="eyebrow">Masters dissertation proposal</p>
+    <h1>Fair federated learning — what to propose and how</h1>
+    <p
+      style="
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+        margin-bottom: 0;
+      "
+    >
+      A structured guide for your conversation with Dr. Ashish Gupta. Use the
+      tabs to navigate each part of the discussion.
+    </p>
+
+    <div class="nav">
+      <button class="nav-btn active" onclick="show('prof')">
+        0. Your supervisor
+      </button>
+      <button class="nav-btn" onclick="show('context')">
+        1. The landscape
+      </button>
+      <button class="nav-btn" onclick="show('problem')">2. The problem</button>
+      <button class="nav-btn" onclick="show('proposals')">
+        3. What to propose
+      </button>
+      <button class="nav-btn" onclick="show('comparison')">
+        4. Comparing directions
+      </button>
+      <button class="nav-btn" onclick="show('plan')">5. The plan</button>
+      <button class="nav-btn" onclick="show('script')">
+        6. Conversation guide
+      </button>
+    </div>
+
+    <!-- SECTION 0: PROFESSOR -->
+    <div class="section visible" id="sec-prof">
+      <h2>Dr. Ashish Gupta — your supervisor</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        Read this before anything else. His research is an almost perfect match
+        for your dissertation direction — this changes how you approach the
+        conversation entirely.
+      </p>
+
+      <div class="card card-accent">
+        <div class="card-title">The single most important thing to know</div>
+        <div class="card-body">
+          Dr. Gupta's listed research areas on Google Scholar are
+          <strong style="font-weight: 500"
+            >Robust Federated Learning, Data Science Applications, and Sensor
+            Data Analytics.</strong
+          >
+          His own website states he is "investigating Federated Learning from
+          the perspectives of robustness and fairness, with a focus on
+          discouraging adversarial participation and minimizing performance
+          disparities among benign clients." That last phrase — minimizing
+          performance disparities among benign clients — is the definition of FL
+          fairness. You are not pitching a new topic to him. You are walking
+          into a conversation with the one professor at BITS Dubai who is
+          already working on exactly what you want to do.
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <span class="tag tag-blue">Background</span>
+          <div class="card-title">Who he is</div>
+          <div class="card-body">
+            Assistant Professor, CS, BITS Pilani Dubai. PhD from IIT BHU
+            Varanasi. Postdoctoral Fellow at Missouri S&T under Prof. Sajal K.
+            Das — one of the most cited researchers in distributed computing and
+            IoT. 863+ citations. Has published in IEEE Transactions on Emerging
+            Topics in Computing, IEEE Transactions on Artificial Intelligence,
+            IEEE Communications Surveys and Tutorials (IF 50.6), and top
+            conference venues including IJCAI, ECAI, INFOCOM, and ESORICS.
+          </div>
+        </div>
+        <div class="card">
+          <span class="tag tag-green">Current focus</span>
+          <div class="card-title">What he's working on right now</div>
+          <div class="card-body">
+            Two parallel FL threads: (1)
+            <strong style="font-weight: 500">Robustness</strong> — defending FL
+            against adversarial clients, backdoor attacks, selfish clients, and
+            collusion. (2) <strong style="font-weight: 500">Fairness</strong> —
+            minimising performance disparities across benign clients. He is also
+            exploring quantum federated learning — a paper accepted at
+            IJCAI-ECAI 2026 on quantum FL backdoor resistance. You focus on the
+            fairness thread, which connects naturally to his robustness work.
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 1.5rem">
+        His most relevant papers — read these before the meeting
+      </h3>
+
+      <div class="card card-accent" style="margin-bottom: 10px">
+        <div class="card-title">
+          FairRFL: Fair and Robust Federated Learning in the Presence of Selfish
+          Clients
+        </div>
+        <div class="card-sub">
+          IEEE Transactions on Emerging Topics in Computing · Vol. 14, No. 1,
+          pp. 316–331 · 2026 · IF 4.8
+        </div>
+        <div class="card-body">
+          This is his most directly relevant paper to your work. It addresses
+          both fairness and robustness simultaneously in FL — specifically when
+          some clients are selfish (withholding useful updates or free-riding).
+          This is the paper your dissertation extends. Read it first. Know it
+          cold. Your proposal builds directly on the gap this paper leaves open:
+          it handles selfish clients but uses static mechanisms — your
+          contribution is making the fairness enforcement dynamic and
+          agent-based.
+        </div>
+      </div>
+
+      <div class="card card-amber" style="margin-bottom: 10px">
+        <div class="card-title">
+          Is Performance Fairness Achievable in Presence of Attackers Under
+          Federated Learning?
+        </div>
+        <div class="card-sub">
+          ECAI 2023 · Core A conference · Kraków, Poland
+        </div>
+        <div class="card-body">
+          A foundational paper asking whether you can even achieve fairness when
+          attackers are present. The answer is nuanced — it depends on the
+          attack type and the fairness definition used. Your dissertation
+          provides a mechanism that tries to answer this in practice: an agent
+          that adapts fairness enforcement even as the threat landscape changes
+          round by round.
+        </div>
+      </div>
+
+      <div class="card card-teal" style="margin-bottom: 10px">
+        <div class="card-title">
+          Long-Short History of Gradients is All You Need: Detecting Malicious
+          and Unreliable Clients in Federated Learning
+        </div>
+        <div class="card-sub">
+          ESORICS 2022 · Core A · Acceptance rate &lt;20%
+        </div>
+        <div class="card-body">
+          His method for detecting adversarial clients using gradient history —
+          a key building block for robust FL. Your agentic orchestrator can
+          incorporate similar gradient-based signals to identify when a client
+          is behaving in a way that harms fairness, not just security. This
+          gives you a technical bridge between his robustness work and your
+          fairness work.
+        </div>
+      </div>
+
+      <div class="card card-purple" style="margin-bottom: 10px">
+        <div class="card-title">
+          FedDOT: Defending Federated Learning Against Overwhelming Targeted
+          Attacks
+        </div>
+        <div class="card-sub">
+          IEEE Transactions on Artificial Intelligence · 2026
+        </div>
+        <div class="card-body">
+          His most recent defence paper — targeted attacks that overwhelm FL
+          defences. Fairness and robustness intersect here: overwhelming attacks
+          disproportionately degrade performance for minority clients. Your work
+          on dynamic fairness enforcement is a natural complement to his defence
+          mechanisms.
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 10px">
+        <span class="tag tag-amber">Bonus — shows breadth</span>
+        <div class="card-title">
+          When Federated Learning Meets Quantum Computing: A Survey and Research
+          Opportunities
+        </div>
+        <div class="card-sub">
+          IEEE Communications Surveys and Tutorials · 2025 · IF 50.6
+        </div>
+        <div class="card-body">
+          His quantum FL direction. You don't need to go here for your
+          dissertation — but knowing this paper exists tells you he is thinking
+          about the future of FL broadly. If the conversation goes well, you can
+          ask about whether quantum approaches could eventually be applied to
+          fairness enforcement — shows intellectual curiosity beyond the
+          immediate task.
+        </div>
+      </div>
+
+      <div class="card card-coral">
+        <div class="card-title">
+          Why this changes your conversation completely
+        </div>
+        <div class="card-body">
+          Most students walk into a supervisor meeting and pitch a topic hoping
+          the professor is interested. You don't have to do that. Dr. Gupta is
+          already working on fair and robust FL — FairRFL was just published in
+          2026. You are walking in to tell him you want to extend his own
+          published work in a new direction (dynamic, agent-based fairness
+          enforcement) while he is actively working in this space. That is the
+          strongest possible position to be in. You are a potential research
+          collaborator, not just a Masters student asking for a topic.
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: LANDSCAPE -->
+    <div class="section" id="sec-context">
+      <h2>Where fair FL sits in 2026</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        Understand this before walking into the meeting. It tells you where the
+        field is, what's been done, and where the gaps are.
+      </p>
+
+      <div class="card card-accent">
+        <div class="card-title">What federated learning actually is</div>
+        <div class="card-body">
+          Multiple clients (hospitals, phones, banks) each train a model locally
+          on their own data. A central server aggregates their model updates —
+          not the data — into one global model. The data never leaves each
+          client. The standard algorithm is FedAvg (McMahan et al., 2017):
+          clients do local gradient steps, send model weights to server, server
+          averages them, sends back.
+        </div>
+      </div>
+
+      <div class="card card-accent">
+        <div class="card-title">
+          Why fairness is a problem in FL specifically
+        </div>
+        <div class="card-body">
+          In standard FL, clients with more data or faster compute dominate the
+          global model. Minority groups, rare demographics, or low-resource
+          clients get worse model performance — even though they participate in
+          training. This is both a technical problem (unequal loss across
+          clients) and a societal one (certain groups get discriminated against
+          by the resulting model). The problem is worse in FL than in
+          centralised ML because you can't see the data, you can only see the
+          model updates.
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <span class="tag tag-green">What exists already</span>
+          <div class="card-title">Current approaches to FL fairness</div>
+          <div class="card-body">
+            <strong style="font-weight: 500">q-FedAvg</strong> — reweights
+            clients by their loss so worse-performing clients get more influence
+            in aggregation.<br /><br />
+            <strong style="font-weight: 500">Ditto</strong> — trains a
+            personalised local model alongside the global model, improving
+            per-client fairness.<br /><br />
+            <strong style="font-weight: 500">FPFL</strong> — frames fairness as
+            a constrained optimisation problem.<br /><br />
+            <strong style="font-weight: 500">FairFedCS</strong> — adjusts client
+            selection probabilities dynamically using Lyapunov optimisation.<br /><br />
+            <strong style="font-weight: 500">FedGraph-Fair</strong> — combines
+            dynamic client graphs with primal-dual fairness objectives (2025).
+          </div>
+        </div>
+        <div class="card">
+          <span class="tag tag-coral">What's still missing</span>
+          <div class="card-title">Open problems — where your work goes</div>
+          <div class="card-body">
+            <strong style="font-weight: 500">Runtime fairness</strong> — all
+            existing methods set constraints at design time. When distributions
+            shift, they fail silently.<br /><br />
+            <strong style="font-weight: 500">Agentic orchestration</strong> — no
+            work uses autonomous agents to manage fairness adaptively. Proposed
+            as a direction in arXiv:2604.04895 (2026) but not implemented.<br /><br />
+            <strong style="font-weight: 500">Multi-level fairness</strong> —
+            fairness between clients AND fairness within clients (across
+            demographic groups in each client's data) simultaneously.<br /><br />
+            <strong style="font-weight: 500"
+              >Fairness under adversarial clients</strong
+            >
+            — what happens to fairness guarantees when some clients are
+            malicious?
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric">
+          <div class="metric-val">2017</div>
+          <div class="metric-label">FedAvg introduced</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">2019</div>
+          <div class="metric-label">First FL fairness papers</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">2026</div>
+          <div class="metric-label">Agentic FL proposed</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">Now</div>
+          <div class="metric-label">Gap you can fill</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: PROBLEM -->
+    <div class="section" id="sec-problem">
+      <h2>The core problem you are solving</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        Be able to state this in one sentence. Everything else in your
+        dissertation flows from this.
+      </p>
+
+      <div class="problem-box">
+        <div class="problem-q">One-sentence problem statement</div>
+        <div
+          class="problem-a"
+          style="font-size: 15px; font-weight: 500; color: var(--text-primary)"
+        >
+          "Fairness constraints in federated learning are enforced statically at
+          design time, making them brittle under distribution shift, client
+          heterogeneity, and adversarial participation — and no existing work
+          uses adaptive agent-based mechanisms to enforce fairness dynamically
+          at runtime."
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card card-amber">
+          <div class="card-title">Why static fairness fails</div>
+          <div class="card-body">
+            <strong style="font-weight: 500">Distribution shift</strong> —
+            client data distributions change over time (seasonal data, user
+            behaviour changes). A fairness constraint calibrated at round 1 may
+            actively harm minority groups by round 100.<br /><br />
+            <strong style="font-weight: 500">Client heterogeneity</strong> — new
+            clients join with different demographic compositions. Static weights
+            designed for the original client set become misaligned.<br /><br />
+            <strong style="font-weight: 500">Non-IID data</strong> — clients
+            have fundamentally different data. Averaging a fixed fairness weight
+            across them treats unequal clients equally — which is itself unfair.
+          </div>
+        </div>
+        <div class="card card-teal">
+          <div class="card-title">Why agents are the right solution</div>
+          <div class="card-body">
+            <strong style="font-weight: 500">Observation</strong> — an agent can
+            observe per-client fairness metrics each round, something static
+            protocols ignore after setup.<br /><br />
+            <strong style="font-weight: 500">Reasoning</strong> — an agent can
+            contextualise why fairness is degrading (new client? data shift?
+            adversarial update?) and respond appropriately to each cause.<br /><br />
+            <strong style="font-weight: 500">Adaptation</strong> — an agent can
+            adjust client selection, aggregation weights, and privacy budgets
+            simultaneously and dynamically — a unified intervention that static
+            methods cannot perform.<br /><br />
+            <strong style="font-weight: 500">Your edge</strong> — you have
+            actually built agentic systems professionally. Most FL researchers
+            have not.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-blue"
+          >Key technical concepts to know before the meeting</span
+        >
+        <div class="card-title" style="margin-bottom: 10px">
+          Fairness definitions you should be able to explain
+        </div>
+        <div class="grid-2" style="margin-bottom: 0">
+          <div>
+            <div class="card-body">
+              <strong style="font-weight: 500"
+                >Group fairness / demographic parity</strong
+              >
+              — the model's positive prediction rate should be equal across
+              demographic groups (e.g. gender, race). Most commonly used in FL
+              fairness literature.
+            </div>
+          </div>
+          <div>
+            <div class="card-body">
+              <strong style="font-weight: 500">Equalized odds</strong> — equal
+              true positive AND false positive rates across groups. Stronger
+              than demographic parity. More appropriate for high-stakes
+              decisions.
+            </div>
+          </div>
+          <div>
+            <div class="card-body">
+              <strong style="font-weight: 500">Client-level fairness</strong> —
+              each FL client (hospital, device) gets similar model performance
+              regardless of how much data they contributed.
+            </div>
+          </div>
+          <div>
+            <div class="card-body">
+              <strong style="font-weight: 500">Individual fairness</strong> —
+              similar individuals get similar predictions. Harder to enforce in
+              FL because you can't see individual data across clients.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: PROPOSALS -->
+    <div class="section" id="sec-proposals">
+      <h2>Three concrete research directions to propose</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        Go in with options, not just one idea. Let the professor help you choose
+        based on feasibility within your semester timeline. Present these in
+        order — Option 1 is your preference.
+      </p>
+
+      <div class="card card-accent">
+        <span class="tag tag-blue"
+          >Option 1 — your preference, highest impact</span
+        >
+        <div class="card-title">
+          Agent-based runtime fairness enforcement in FL
+        </div>
+        <div class="card-sub">
+          Estimated scope: 4–5 months · Difficulty: Medium-High · Paper
+          potential: Strong
+        </div>
+        <div class="card-body">
+          <strong style="font-weight: 500">What you build:</strong> A simple
+          rule-based agent that sits at the FL server. Each round, it observes
+          per-client loss disparity and a fairness metric (e.g. demographic
+          parity gap). When fairness degrades beyond a threshold, the agent
+          dynamically adjusts: (a) client selection weights — upweighting
+          underrepresented clients, (b) aggregation coefficients — giving more
+          weight to clients whose updates improve fairness, (c) optionally,
+          local training epochs per client.<br /><br />
+          <strong style="font-weight: 500"
+            >Why it's feasible for a Masters:</strong
+          >
+          You start with a simple rule-based agent, not a learned one.
+          Rule-based agents are fast to implement and still produce a meaningful
+          research contribution when compared to static baselines. If time
+          allows, you extend to a learned policy (Q-learning or a small neural
+          policy).<br /><br />
+          <strong style="font-weight: 500">What makes it novel:</strong> No
+          published paper implements agent-based orchestration specifically for
+          fairness enforcement at runtime. arXiv:2604.04895 (April 2026)
+          proposes this paradigm but does not implement it. You would be the
+          first empirical implementation.<br /><br />
+          <strong style="font-weight: 500">Baselines to beat:</strong> FedAvg
+          (no fairness), q-FedAvg, Ditto. Beat all three on fairness metrics
+          without unacceptable accuracy loss.<br /><br />
+          <strong style="font-weight: 500">Dataset:</strong> Adult Income
+          dataset or COMPAS — standard fairness benchmarks. Simulate as FL using
+          Flower framework (flower.dev). Non-IID split across clients using
+          Dirichlet distribution.
+        </div>
+      </div>
+
+      <div class="card card-amber">
+        <span class="tag tag-amber"
+          >Option 2 — solid, slightly more conservative</span
+        >
+        <div class="card-title">
+          Fairness-aware client selection under heterogeneous data distributions
+        </div>
+        <div class="card-sub">
+          Estimated scope: 3–4 months · Difficulty: Medium · Paper potential:
+          Good
+        </div>
+        <div class="card-body">
+          <strong style="font-weight: 500">What you build:</strong> A client
+          selection mechanism that considers both model performance and fairness
+          when choosing which clients participate in each FL round. Existing
+          work (FairFedCS) uses Lyapunov optimisation. Your approach: use a
+          lightweight scoring agent that ranks clients by their estimated
+          fairness contribution — clients whose data would improve demographic
+          parity get higher selection probability.<br /><br />
+          <strong style="font-weight: 500">Why it's feasible:</strong> Client
+          selection is a well-defined, bounded problem. The implementation scope
+          is more contained than full orchestration. Strong baseline literature
+          exists to compare against (FairFedCS, random selection,
+          contribution-based selection).<br /><br />
+          <strong style="font-weight: 500">What makes it novel:</strong>
+          Explicitly framing client selection as a fairness intervention rather
+          than just a performance optimisation. Adding the agent-based adaptive
+          element on top of existing scoring methods.<br /><br />
+          <strong style="font-weight: 500">Connection to Option 1:</strong> This
+          can be framed as a component of the larger Option 1 system — your
+          dissertation does client selection, the PhD work does the full
+          orchestration stack. Natural progression.
+        </div>
+      </div>
+
+      <div class="card card-teal">
+        <span class="tag tag-green"
+          >Option 3 — most feasible, if timeline is tight</span
+        >
+        <div class="card-title">
+          Privacy-fairness tradeoff analysis in FL with adaptive DP budgets
+        </div>
+        <div class="card-sub">
+          Estimated scope: 3 months · Difficulty: Medium · Paper potential:
+          Good, theory-heavy
+        </div>
+        <div class="card-body">
+          <strong style="font-weight: 500">What you build:</strong> An empirical
+          and theoretical analysis of how differential privacy noise in FL
+          disproportionately harms minority groups — and a mechanism that
+          allocates privacy budgets per client group to balance the
+          privacy-fairness tradeoff. The agent component: a budget allocation
+          policy that adapts per-group DP noise levels based on observed
+          fairness degradation.<br /><br />
+          <strong style="font-weight: 500">Why it's feasible:</strong> Primarily
+          analytical with a focused implementation. The privacy-fairness
+          tradeoff is well-documented theoretically (Kamath et al., ICML 2024) —
+          you are extending it to the FL setting empirically.<br /><br />
+          <strong style="font-weight: 500">What makes it novel:</strong> Most FL
+          fairness work ignores privacy entirely. Most FL privacy work ignores
+          fairness. The interaction is an open problem explicitly flagged in the
+          2026 FL fairness survey (arXiv:2602.00718).<br /><br />
+          <strong style="font-weight: 500">Risk:</strong> More theoretical — if
+          you are stronger at building systems than proving theorems, Option 1
+          or 2 plays more to your strengths.
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: COMPARISON -->
+    <div class="section" id="sec-comparison">
+      <h2>Comparing the three directions</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        Use this to decide which one to pitch as your primary proposal. Also
+        useful if the professor pushes back on one and you need to pivot
+        quickly.
+      </p>
+
+      <table class="comp-table">
+        <tr>
+          <th>Criterion</th>
+          <th class="yours">Option 1 — Agentic runtime fairness</th>
+          <th>Option 2 — Fair client selection</th>
+          <th>Option 3 — Privacy-fairness tradeoff</th>
+        </tr>
+        <tr>
+          <td>Novelty</td>
+          <td class="yours">
+            <span class="check">✓ High</span> — no implementation exists yet
+          </td>
+          <td><span class="partial">~ Medium</span> — builds on FairFedCS</td>
+          <td><span class="partial">~ Medium</span> — extends Kamath et al.</td>
+        </tr>
+        <tr>
+          <td>Feasibility in one semester</td>
+          <td class="yours">
+            <span class="partial">~ Medium</span> — needs scope control
+          </td>
+          <td><span class="check">✓ High</span> — bounded problem</td>
+          <td><span class="check">✓ High</span> — mostly analytical</td>
+        </tr>
+        <tr>
+          <td>Uses your agentic AI background</td>
+          <td class="yours"><span class="check">✓ Directly</span></td>
+          <td><span class="partial">~ Partially</span></td>
+          <td><span class="cross">✗ Minimally</span></td>
+        </tr>
+        <tr>
+          <td>Uses your systems design background</td>
+          <td class="yours"><span class="check">✓ Directly</span></td>
+          <td><span class="check">✓ Yes</span></td>
+          <td><span class="cross">✗ Less so</span></td>
+        </tr>
+        <tr>
+          <td>PhD application impact</td>
+          <td class="yours"><span class="check">✓ Strongest story</span></td>
+          <td><span class="partial">~ Strong</span></td>
+          <td><span class="partial">~ Good</span></td>
+        </tr>
+        <tr>
+          <td>Workshop paper potential</td>
+          <td class="yours">
+            <span class="check">✓ High</span> — novel + empirical
+          </td>
+          <td><span class="check">✓ Good</span></td>
+          <td><span class="partial">~ Medium</span> — needs strong theory</td>
+        </tr>
+        <tr>
+          <td>Risk level</td>
+          <td class="yours">
+            <span class="partial">~ Medium</span> — manage scope carefully
+          </td>
+          <td><span class="check">✓ Low</span></td>
+          <td>
+            <span class="partial">~ Medium</span> — theory proofs take time
+          </td>
+        </tr>
+        <tr>
+          <td>Natural PhD extension</td>
+          <td class="yours">
+            <span class="check">✓ Full orchestration stack</span>
+          </td>
+          <td><span class="check">✓ Into Option 1</span></td>
+          <td><span class="check">✓ Into DP + fair FL theory</span></td>
+        </tr>
+      </table>
+
+      <div class="card" style="margin-top: 1rem">
+        <span class="tag tag-blue">Recommendation</span>
+        <div class="card-title">
+          Go in proposing Option 1. Offer Option 2 as fallback.
+        </div>
+        <div class="card-body">
+          Option 1 is the strongest research story and the best use of your
+          combined background. The risk is scope — a full agentic orchestration
+          system is ambitious for one semester. The mitigation is to start with
+          a rule-based agent and draw a clear line: "the dissertation implements
+          the rule-based version; the PhD extends it to a learned policy." This
+          is a legitimate and common research progression. If the professor says
+          Option 1 is too large for the semester, offer Option 2 — it can be
+          framed as the client selection component of Option 1, so the story
+          stays coherent.
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 5: PLAN -->
+    <div class="section" id="sec-plan">
+      <h2>Execution plan — one semester</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        Bring this to the meeting. Shows the professor you've thought about
+        feasibility, not just the idea.
+      </p>
+
+      <div class="card" style="margin-bottom: 1.2rem">
+        <span class="tag tag-blue"
+          >Tools and frameworks — tell your prof what you'll use</span
+        >
+        <div class="card-body">
+          <strong style="font-weight: 500">Flower (flower.dev)</strong> — Python
+          FL simulation framework. Industry-standard, well-documented, used in
+          most recent FL research. Lets you simulate 10–100 clients on a single
+          machine without real distributed hardware.<br /><br />
+          <strong style="font-weight: 500">PyTorch</strong> — standard deep
+          learning framework for the local models on each simulated client.<br /><br />
+          <strong style="font-weight: 500"
+            >Adult Income / COMPAS datasets</strong
+          >
+          — standard fairness benchmarks. Both have well-defined sensitive
+          attributes (race, gender) and binary classification tasks. Widely used
+          in FL fairness papers so your results are directly comparable.<br /><br />
+          <strong style="font-weight: 500">Fairlearn / AIF360</strong> — Python
+          libraries for computing fairness metrics (demographic parity,
+          equalized odds) from model predictions.
+        </div>
+      </div>
+
+      <div class="tl">
+        <div class="tl-item">
+          <div class="tl-dot dot-blue">Sep</div>
+          <div class="tl-body">
+            <div class="tl-title">Literature review + setup (weeks 1–3)</div>
+            <div class="tl-desc">
+              Read core papers: FedAvg, q-FedAvg, Ditto, FairFedCS,
+              arXiv:2604.04895. Set up Flower environment. Implement standard
+              FedAvg as your first working baseline. Define your fairness metric
+              — demographic parity gap as primary measure.
+            </div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot dot-blue">Oct</div>
+          <div class="tl-body">
+            <div class="tl-title">
+              Baseline implementation + experiments (weeks 4–7)
+            </div>
+            <div class="tl-desc">
+              Implement q-FedAvg and Ditto as your comparison baselines. Run all
+              three on Adult Income dataset with 10-client non-IID FL
+              simulation. Document baseline fairness and accuracy numbers. These
+              become your Table 1 in the paper.
+            </div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot dot-blue">Nov</div>
+          <div class="tl-body">
+            <div class="tl-title">
+              Your method — build and test (weeks 8–11)
+            </div>
+            <div class="tl-desc">
+              Build the rule-based fairness agent. Implement the observation
+              loop (per-client fairness metrics per round) and the intervention
+              logic (dynamic client weights, aggregation adjustment). Run full
+              experiment. Iterate until you beat baselines on fairness with
+              acceptable accuracy tradeoff.
+            </div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot dot-green">Dec</div>
+          <div class="tl-body">
+            <div class="tl-title">
+              Writing — dissertation + workshop paper (weeks 12–16)
+            </div>
+            <div class="tl-desc">
+              Write dissertation chapters and paper in parallel — they share the
+              same results, introduction, and related work. Paper format: 4–6
+              pages for an ICLR 2027 workshop. Dissertation: full academic
+              format per BITS guidelines. Submit paper to workshop in January
+              after dissertation is done.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-purple" style="margin-top: 1rem">
+        <span class="tag tag-purple"
+          >The scoping conversation — say this to your prof</span
+        >
+        <div class="card-body">
+          "To keep this feasible in one semester, I want to scope the
+          dissertation to a rule-based agent implementation and empirical
+          evaluation. I'm treating a learned policy — RL or otherwise — as
+          future work for the PhD. Does that feel like the right scope for a
+          Masters dissertation?"
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 6: CONVERSATION GUIDE -->
+    <div class="section" id="sec-script">
+      <h2>Conversation guide</h2>
+      <p
+        style="
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin-bottom: 1.2rem;
+        "
+      >
+        How to open, how to present your idea, and how to handle likely
+        responses. Not a script to memorise — a structure to internalise.
+      </p>
+
+      <div class="script-block">
+        <div class="speaker">How to open — first 2 minutes</div>
+        <div class="you">
+          "Dr. Gupta, I've read your recent work on fair and robust federated
+          learning — particularly FairRFL and your ECAI 2023 paper on
+          performance fairness under attackers — and I wanted to come to you
+          with a concrete dissertation direction that builds directly on what
+          your lab is working on. I have a specific idea I'd like to get your
+          feedback on, and I think it could also produce a workshop paper
+          alongside the dissertation if you're open to that."
+        </div>
+        <div class="note">
+          Opening with his specific paper titles signals immediately that you've
+          done real homework. This is not a generic pitch — you've read his
+          work. That alone puts you in the top 5% of students who approach
+          supervisors.
+        </div>
+      </div>
+
+      <div class="script-block">
+        <div class="speaker">Presenting the gap in his own work</div>
+        <div class="you">
+          "FairRFL addresses fairness and robustness together when selfish
+          clients are present — which is an important contribution. The gap I
+          see is that the fairness enforcement mechanism is still static —
+          calibrated at design time. In real FL deployments, data distributions
+          shift, new clients join, and the nature of selfish behaviour changes
+          round by round. I want to build on your work by introducing a
+          lightweight agent at the server side that dynamically monitors and
+          enforces fairness constraints each round, adapting to runtime
+          conditions rather than relying on fixed parameters."
+        </div>
+        <div class="note">
+          You are explicitly framing your work as extending his. This is the
+          right approach — you're not competing with FairRFL, you're building
+          the next layer on top of it. Professors respond very positively to
+          students who understand their work well enough to identify what comes
+          next.
+        </div>
+      </div>
+
+      <div class="script-block">
+        <div class="speaker">
+          Likely response A — he's engaged and asks for specifics
+        </div>
+        <div class="prof">
+          "That's an interesting direction. How would the agent work, and how
+          would you connect it to the robustness dimension?"
+        </div>
+        <div class="you">
+          "The agent observes two signals each round: per-client fairness metric
+          — demographic parity gap — and gradient history, which your ESORICS
+          2022 paper showed is a strong signal for detecting unreliable clients.
+          When fairness degrades, the agent determines whether it's due to
+          natural distribution shift or adversarial behaviour, and responds
+          differently to each — reweighting clients for the former, flagging and
+          reducing the influence of suspicious clients for the latter. I'd
+          evaluate against FedAvg, q-FedAvg, Ditto, and FairRFL as baselines on
+          the Adult Income dataset. The goal is to show that dynamic enforcement
+          outperforms static enforcement, especially under non-stationary
+          conditions."
+        </div>
+      </div>
+
+      <div class="script-block">
+        <div class="speaker">Likely response B — he questions the scope</div>
+        <div class="prof">
+          "This sounds ambitious. How are you scoping it for one semester?"
+        </div>
+        <div class="you">
+          "I'll start with a rule-based agent — fixed decision logic, no
+          learning — implemented in Flower framework. That's achievable in 6–8
+          weeks and is still novel because no paper has done this empirically. A
+          learned policy using RL becomes future work explicitly flagged in the
+          dissertation — which gives me a natural PhD research agenda. The
+          dissertation demonstrates the concept works; the PhD builds the full
+          system. Does that scope feel appropriate to you?"
+        </div>
+      </div>
+
+      <div class="script-block">
+        <div class="speaker">
+          Likely response C — he steers toward robustness over fairness
+        </div>
+        <div class="prof">
+          "My current focus is more on the robustness side. Could you frame this
+          more as a robustness problem?"
+        </div>
+        <div class="you">
+          "Absolutely — your FedDOT paper on overwhelming targeted attacks shows
+          that robustness mechanisms need to be adaptive, not just reactive. I
+          could frame the agent as a robustness-first orchestrator that uses
+          fairness metrics as an early warning signal — when fairness degrades
+          unexpectedly, it's often a sign of coordinated adversarial activity.
+          That connects the fairness and robustness threads in a single system,
+          which seems like a natural extension of FairRFL's joint framing."
+        </div>
+        <div class="note">
+          This pivot reframes fairness as a diagnostic signal for robustness —
+          keeping your direction intact while aligning with wherever his current
+          emphasis lies.
+        </div>
+      </div>
+
+      <div class="script-block">
+        <div class="speaker">The paper conversation — raise this yourself</div>
+        <div class="you">
+          "I'd also like to discuss the possibility of extracting a workshop
+          paper from this work — targeting ICLR 2027 workshops in January, or a
+          federated learning workshop at a similar venue. The dissertation
+          results would be the core contribution. I'd handle the bulk of the
+          writing and implementation. Would you be open to co-authoring if the
+          results are strong? It would strengthen my PhD applications
+          significantly, and it's a natural extension of the FairRFL line of
+          work."
+        </div>
+        <div class="note">
+          Frame it as a continuation of his research programme, not just a
+          favour to you. A co-authored workshop paper costs him relatively
+          little time and adds to his publication record.
+        </div>
+      </div>
+
+      <div class="script-block">
+        <div class="speaker">The PhD connection — close with this</div>
+        <div class="you">
+          "The reason this topic matters to me beyond the dissertation is that
+          I'm planning to apply for a PhD — specifically at universities with
+          strong FL and fairness programmes. I see this dissertation as the
+          foundation of my PhD research statement. Working under you on a
+          direction that you've already published in — and having potentially a
+          submitted workshop paper — would make a meaningful difference to those
+          applications. That's part of why I wanted to discuss this with you now
+          rather than later."
+        </div>
+      </div>
+
+      <hr />
+      <h2>Questions to ask Dr. Gupta specifically</h2>
+      <div class="card">
+        <div class="card-body">
+          <strong style="font-weight: 500">On extending FairRFL:</strong> "In
+          FairRFL, how did you define and measure the performance disparity
+          across benign clients — and do you think that metric is the right one
+          for a dynamic enforcement scenario?"<br /><br />
+          <strong style="font-weight: 500">On datasets:</strong> "FairRFL used
+          specific FL benchmarks — which datasets do you think would best
+          demonstrate the dynamic enforcement advantage I'm proposing?"<br /><br />
+          <strong style="font-weight: 500">On tools:</strong> "Do you have a
+          preferred FL simulation framework in your lab, or are you comfortable
+          with Flower?"<br /><br />
+          <strong style="font-weight: 500">On scope:</strong> "Given the
+          semester timeline, would you recommend I focus the agent on client
+          selection first — as a contained, well-defined problem — and treat
+          aggregation weight adjustment as future work?"<br /><br />
+          <strong style="font-weight: 500">On the quantum direction:</strong>
+          "Your quantum FL work is fascinating — do you see a longer-term
+          connection between quantum approaches and fairness enforcement, or are
+          those separate threads for now?"<br /><br />
+          <strong style="font-weight: 500">On supervision cadence:</strong> "How
+          often would we meet during the semester, and at what stage would you
+          want to review the first experimental results?"
+        </div>
+      </div>
+    </div>
+
+    <p class="note-text">
+      Dissertation proposal guide — Aug 2026 · Based on FL fairness literature
+      current to mid-2026 · Verify specific paper details before the meeting
+    </p>
+
+    <script>
+      function show(id) {
+        document
+          .querySelectorAll(".section")
+          .forEach((s) => s.classList.remove("visible"));
+        document
+          .querySelectorAll(".nav-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById("sec-" + id).classList.add("visible");
+        event.target.classList.add("active");
+        window.scrollTo(0, 0);
+      }
+      // Set initial visible section to prof
+      document.addEventListener("DOMContentLoaded", function () {
+        document
+          .querySelectorAll(".section")
+          .forEach((s) => s.classList.remove("visible"));
+        document.getElementById("sec-prof").classList.add("visible");
+      });
+    </script>
+  </body>
+</html>

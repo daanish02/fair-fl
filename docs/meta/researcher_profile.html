@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Researcher Profile</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans, system-ui, sans-serif); font-size: 15px; line-height: 1.6; color: var(--text-primary, #0b0b0b); background: transparent; padding: 1.5rem 1rem 3rem; max-width: 860px; margin: 0 auto; }
+ 
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  h2 { font-size: 16px; font-weight: 500; margin: 2rem 0 0.75rem; }
+  h3 { font-size: 13px; font-weight: 500; color: var(--text-muted, #898781); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.5rem 0 0.6rem; }
+  .subtitle { font-size: 13px; color: var(--text-muted, #898781); margin-bottom: 2rem; }
+ 
+  .spine-card { background: var(--surface-1, #fcfcfb); border: 0.5px solid var(--border, rgba(11,11,11,0.10)); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; border-left: 3px solid #2a78d6; }
+  .spine-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+  .spine-desc { font-size: 13px; color: var(--text-secondary, #52514e); line-height: 1.7; }
+ 
+  .skills-section { margin-bottom: 1.5rem; }
+  .skill-group { margin-bottom: 1rem; }
+  .skill-group-label { font-size: 12px; font-weight: 500; color: var(--text-muted, #898781); margin-bottom: 6px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pill { font-size: 12px; padding: 4px 11px; border-radius: 20px; border: 0.5px solid var(--border-strong, rgba(11,11,11,0.20)); color: var(--text-secondary, #52514e); background: var(--surface-1, #fcfcfb); }
+  .pill-strong { font-size: 12px; padding: 4px 11px; border-radius: 20px; background: #E6F1FB; color: #0C447C; border: 0.5px solid #B5D4F4; font-weight: 500; }
+  .pill-mid { font-size: 12px; padding: 4px 11px; border-radius: 20px; background: #E1F5EE; color: #085041; border: 0.5px solid #9FE1CB; }
+  .pill-soft { font-size: 12px; padding: 4px 11px; border-radius: 20px; background: #FAEEDA; color: #633806; border: 0.5px solid #FAC775; }
+ 
+  .area-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .area-card { background: var(--surface-1, #fcfcfb); border: 0.5px solid var(--border, rgba(11,11,11,0.10)); border-radius: 12px; padding: 1rem 1.1rem; }
+  .area-tag { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; }
+  .tag-primary { background: #E6F1FB; color: #0C447C; }
+  .tag-secondary { background: #E1F5EE; color: #085041; }
+  .tag-applied { background: #FAEEDA; color: #633806; }
+  .tag-systems { background: #EEEDFE; color: #26215C; }
+  .area-name { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
+  .area-desc { font-size: 12px; color: var(--text-secondary, #52514e); line-height: 1.55; }
+  .area-why { font-size: 11px; color: var(--text-muted, #898781); margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--border, rgba(11,11,11,0.10)); font-style: italic; }
+ 
+  .interest-list { list-style: none; }
+  .interest-list li { font-size: 13px; color: var(--text-secondary, #52514e); padding: 7px 0; border-bottom: 0.5px solid var(--border, rgba(11,11,11,0.10)); display: flex; gap: 10px; align-items: flex-start; }
+  .interest-list li:last-child { border-bottom: none; }
+  .interest-list li::before { content: "→"; color: var(--text-muted, #898781); flex-shrink: 0; font-size: 12px; padding-top: 1px; }
+ 
+  .context-box { background: var(--surface-1, #fcfcfb); border: 0.5px solid var(--border, rgba(11,11,11,0.10)); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 10px; }
+  .context-label { font-size: 11px; font-weight: 500; color: var(--text-muted, #898781); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .context-value { font-size: 13px; color: var(--text-primary, #0b0b0b); line-height: 1.6; }
+ 
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem; }
+  @media (max-width: 500px) { .two-col { grid-template-columns: 1fr; } }
+ 
+  hr { border: none; border-top: 0.5px solid var(--border, rgba(11,11,11,0.10)); margin: 2rem 0; }
+ 
+  @media (prefers-color-scheme: dark) {
+    .pill-strong { background: #0C447C; color: #B5D4F4; border-color: #185FA5; }
+    .pill-mid { background: #085041; color: #9FE1CB; border-color: #0F6E56; }
+    .pill-soft { background: #412402; color: #FAC775; border-color: #633806; }
+    .tag-primary { background: #0C447C; color: #B5D4F4; }
+    .tag-secondary { background: #085041; color: #9FE1CB; }
+    .tag-applied { background: #412402; color: #FAC775; }
+    .tag-systems { background: #26215C; color: #CECBF6; }
+  }
+</style>
+</head>
+<body>
+ 
+<h1>Researcher profile</h1>
+<p class="subtitle">For use in professor outreach and university research chats — paste this at the start of any conversation.</p>
+ 
+<hr>
+ 
+<h3>Background</h3>
+<div class="two-col">
+  <div class="context-box">
+    <div class="context-label">Degree</div>
+    <div class="context-value">Masters in Software Systems, BITS Pilani Dubai — GPA 9.34/10</div>
+  </div>
+  <div class="context-box">
+    <div class="context-label">Dissertation</div>
+    <div class="context-value">Fair federated learning — dynamic fairness enforcement in FL systems</div>
+  </div>
+  <div class="context-box">
+    <div class="context-label">Work experience</div>
+    <div class="context-value">Building agentic AI software systems that use autonomous agents to deliver real-world objectives</div>
+  </div>
+  <div class="context-box">
+    <div class="context-label">Target</div>
+    <div class="context-value">PhD in Computer Science / AI-ML, Fall 2027 intake</div>
+  </div>
+</div>
+ 
+<hr>
+ 
+<h3>Skill stack</h3>
+<div class="skills-section">
+  <div class="skill-group">
+    <div class="skill-group-label">Strong — hands-on experience</div>
+    <div class="pills">
+      <span class="pill-strong">Federated learning</span>
+      <span class="pill-strong">Agentic AI systems</span>
+      <span class="pill-strong">System design & architecture</span>
+      <span class="pill-strong">Data engineering & pipelines</span>
+    </div>
+  </div>
+  <div class="skill-group" style="margin-top:10px">
+    <div class="skill-group-label">Solid foundation — theoretical + applied</div>
+    <div class="pills">
+      <span class="pill-mid">Machine learning</span>
+      <span class="pill-mid">Deep learning</span>
+      <span class="pill-mid">Neural networks</span>
+      <span class="pill-mid">Distributed systems</span>
+    </div>
+  </div>
+  <div class="skill-group" style="margin-top:10px">
+    <div class="skill-group-label">Growing — active dissertation focus</div>
+    <div class="pills">
+      <span class="pill-soft">Algorithmic fairness</span>
+      <span class="pill-soft">Privacy-preserving ML</span>
+      <span class="pill-soft">Responsible AI</span>
+      <span class="pill-soft">Differential privacy</span>
+    </div>
+  </div>
+</div>
+ 
+<hr>
+ 
+<h3>Research spine</h3>
+<div class="spine-card">
+  <div class="spine-title">Agentic Orchestration for Fair and Robust Federated Learning</div>
+  <div class="spine-desc">
+    Using autonomous agents to dynamically manage fairness constraints, client selection, privacy budgets, and aggregation in FL systems — replacing static protocols with adaptive, agent-based enforcement that responds to runtime conditions.<br><br>
+    The core problem: existing FL fairness approaches set constraints at design time. Under distribution shift, heterogeneous clients, and adversarial participation, these constraints fail at runtime. An agentic orchestration layer can observe, reason, and enforce fairness adaptively — treating fairness as a live system property, not a one-time configuration.
+  </div>
+</div>
+ 
+<hr>
+ 
+<h3>Research areas — detailed</h3>
+<div class="area-grid">
+  <div class="area-card">
+    <span class="area-tag tag-primary">Primary — dissertation core</span>
+    <div class="area-name">Fair federated learning</div>
+    <div class="area-desc">Enforcing fairness constraints (demographic parity, equalized odds, group fairness) during FL training across heterogeneous clients with non-IID data distributions. Focus on dynamic enforcement rather than static design-time constraints.</div>
+    <div class="area-why">This is my dissertation and primary research identity going into the PhD.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-primary">Primary — work experience</span>
+    <div class="area-name">Agentic AI systems</div>
+    <div class="area-desc">Building software that uses autonomous agents to pursue objectives — agent perception, decision-making, tool use, and multi-step planning. Applied experience with LLM-based and rule-based agent architectures in production systems.</div>
+    <div class="area-why">Professional background. Differentiates me from pure ML or pure theory researchers.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-secondary">Secondary — bridge area</span>
+    <div class="area-name">Dynamic fairness enforcement</div>
+    <div class="area-desc">Treating fairness not as a design-time property but as an adaptive runtime guarantee. Fairness violations detected and corrected in real time as data distributions shift, new clients join, or adversarial behaviour emerges.</div>
+    <div class="area-why">This is the central contribution of my paper — where agentic AI meets FL fairness.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-secondary">Secondary — theoretical depth</span>
+    <div class="area-name">Privacy-fairness tradeoffs in FL</div>
+    <div class="area-desc">Differential privacy mechanisms applied to FL often disproportionately harm underrepresented groups, worsening fairness. Dynamic privacy budget allocation per client group can balance both guarantees simultaneously.</div>
+    <div class="area-why">Adds theoretical rigour to the systems-level work. Connects to published literature on DP + fairness.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-applied">Applied — industry relevance</span>
+    <div class="area-name">Trustworthy AI in real-world systems</div>
+    <div class="area-desc">FL for high-stakes domains — fraud detection, healthcare, personalisation — where fairness is a regulatory requirement (GDPR, EU AI Act). Agentic orchestration makes fairness auditable and enforceable in deployed systems.</div>
+    <div class="area-why">Keeps research grounded in real impact. Important for post-PhD industry roles.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-systems">Systems — background strength</span>
+    <div class="area-name">FL system architecture</div>
+    <div class="area-desc">How FL systems are built — communication protocols, client-server architecture, aggregation pipelines, fault tolerance, scalability. System design perspective on federated learning that most ML researchers lack.</div>
+    <div class="area-why">Lets me contribute to systems-oriented research threads where pure ML background is insufficient.</div>
+  </div>
+</div>
+ 
+<hr>
+ 
+<h3>Specific research interests — what excites me</h3>
+<ul class="interest-list">
+  <li>Using reinforcement learning agents to learn aggregation policies that optimise for both model performance and fairness metrics simultaneously</li>
+  <li>Multi-agent FL where both server-side and client-side agents coordinate — clients as local fairness guardians, server as global orchestrator</li>
+  <li>Fairness auditability — designing agent-based systems whose fairness decisions are explainable and verifiable after the fact</li>
+  <li>Robustness at the intersection of fairness and security — how do you maintain fairness guarantees when some FL clients are adversarial or corrupted</li>
+  <li>The sociotechnical dimension of FL fairness — how fairness definitions map to real-world harms in specific deployment contexts</li>
+  <li>Applying agentic FL to real industry problems where fairness is not optional — credit scoring, healthcare triage, content moderation</li>
+</ul>
+ 
+<hr>
+ 
+<h3>What I am looking for in a PhD</h3>
+<ul class="interest-list">
+  <li>A supervisor whose active research intersects federated learning, algorithmic fairness, or agentic/multi-agent systems — ideally at least two of these three</li>
+  <li>Research that produces both theoretical contributions and working systems — not purely abstract, not purely engineering</div></li>
+  <li>Industry connections that allow internships or collaborations during the PhD — I plan to work in industry after graduating</li>
+  <li>A lab culture where systems-oriented thinking is valued alongside mathematical rigour</li>
+</ul>
+ 
+<hr>
+ 
+<h3>Adjacent areas — if fair FL isn't available</h3>
+<p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem">These are nearby research areas I can credibly work in if my dissertation ends up in a different direction, or if a potential supervisor doesn't work on fair FL specifically. Each one is close enough that my background transfers directly, and each keeps the PhD work relevant to my long-term research direction.</p>
+ 
+<div class="area-grid">
+  <div class="area-card">
+    <span class="area-tag tag-primary">Closest — same problem, different angle</span>
+    <div class="area-name">Algorithmic fairness in ML broadly</div>
+    <div class="area-desc">Fairness definitions, bias detection, and debiasing techniques in standard ML settings — not necessarily federated. Covers group fairness, individual fairness, counterfactual fairness, and causal approaches. Every fairness technique I develop here directly ports to FL when combined with my existing knowledge.</div>
+    <div class="area-why">If a supervisor works on fairness in ML generally but not FL specifically, this is a natural landing zone. I bring the FL perspective; they bring the fairness theory depth.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-primary">Closest — same setting, different property</span>
+    <div class="area-name">Robust federated learning</div>
+    <div class="area-desc">Making FL resilient to adversarial clients, data poisoning, Byzantine failures, and model inversion attacks. Robustness and fairness are deeply connected — a system that is fair to all clients must also be robust to clients that manipulate the learning process. Aggregation protocols, anomaly detection, and secure aggregation all apply.</div>
+    <div class="area-why">If a supervisor works on FL robustness or security rather than fairness, my dissertation work in FL is directly transferable. The jump from robust FL to fair FL is short and well-motivated.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-secondary">Close — shared theoretical foundation</span>
+    <div class="area-name">Privacy-preserving machine learning</div>
+    <div class="area-desc">Differential privacy, secure multi-party computation, homomorphic encryption applied to ML training and inference. FL is inherently a privacy-preserving paradigm, so this area overlaps significantly. The privacy-fairness tradeoff — where adding noise for privacy disproportionately harms minority groups — is an active open problem.</div>
+    <div class="area-why">Strong theoretical depth that complements my systems background. Published literature on DP + fairness gives me an immediate entry point and connects back to fair FL naturally.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-secondary">Close — same systems perspective</span>
+    <div class="area-name">Trustworthy and responsible AI</div>
+    <div class="area-desc">Broader umbrella covering fairness, accountability, transparency, explainability, and safety in AI systems. Includes work on auditing AI systems, regulatory compliance (EU AI Act, GDPR), and harm reduction frameworks. Sociotechnical rather than purely technical — connects algorithmic properties to real-world consequences.</div>
+    <div class="area-why">If a supervisor works on responsible AI more broadly, my FL fairness work fits naturally as a case study in trustworthy distributed AI. Keeps research practically grounded and industry-relevant.</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-systems">Adjacent — my work experience angle</span>
+    <div class="area-name">Multi-agent systems and MARL</div>
+    <div class="area-desc">Multi-agent reinforcement learning, cooperative and competitive agent interactions, mechanism design for multi-agent settings. FL is inherently multi-agent — clients are agents with local objectives, the server coordinates them. MARL provides a formal framework for reasoning about FL dynamics, fairness, and incentive alignment.</div>
+    <div class="area-why">Directly leverages my agentic AI work experience. A supervisor in MARL who is open to applying it to distributed learning is a natural fit, even if they don't use the word "federated learning."</div>
+  </div>
+  <div class="area-card">
+    <span class="area-tag tag-applied">Adjacent — industry-facing</span>
+    <div class="area-name">ML systems and MLOps at scale</div>
+    <div class="area-desc">How ML models are trained, deployed, monitored, and updated in production — distributed training, model serving, data pipelines, drift detection, continual learning. FL is a special case of distributed ML training. My system design background and data engineering experience are directly applicable here.</div>
+    <div class="area-why">Fallback that fully uses my systems and data background. Strong industry demand post-PhD. Can frame fairness and robustness as properties of production ML systems, keeping the research coherent with my overall direction.</div>
+  </div>
+</div>
+ 
+<p style="font-size:12px;color:var(--text-muted);margin-top:2.5rem">Researcher profile — updated Aug 2026 · Paste at the start of any professor research or outreach chat</p>
+ 
+</body>
+</html>
+ 
