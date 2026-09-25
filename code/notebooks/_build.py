@@ -57,8 +57,13 @@ code("""
 import os, sys, subprocess, time
 from pathlib import Path
 
-ON_KAGGLE = os.path.exists("/kaggle")
-ON_COLAB = "google.colab" in sys.modules or os.path.exists("/content")
+try:
+    import google.colab  # noqa: F401  (only importable on Colab)
+    ON_COLAB = True
+except ImportError:
+    ON_COLAB = False
+# Colab images can contain a /kaggle folder, so detect Kaggle by its own environment variable.
+ON_KAGGLE = not ON_COLAB and "KAGGLE_KERNEL_RUN_TYPE" in os.environ
 print("platform:", "kaggle" if ON_KAGGLE else "colab" if ON_COLAB else "local")
 
 if ON_KAGGLE:
@@ -77,6 +82,8 @@ RESULTS = WORK / "runs"
 # Merge it into the repo's code/results/runs.jsonl afterwards (append the lines).
 os.environ["FAIRFL_RESULTS_DIR"] = str(WORK / "results")
 print("work:", WORK, "| repo:", REPO)
+if ON_COLAB and USE_DRIVE:
+    assert str(WORK).startswith("/content/drive"), "Drive is not mounted: results would be lost at session end"
 """)
 
 code("""
