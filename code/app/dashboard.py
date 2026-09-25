@@ -1,4 +1,5 @@
-"""FL fairness testbed dashboard: run any registered strategy and compare saved runs under a fairness scheme.
+"""FL fairness testbed dashboard: run any registered strategy, compare saved runs under a fairness scheme, and
+see how the paper reproductions compare with the published numbers (Reproduction tab).
 
 Launch from code/:  uv run python -m streamlit run app/dashboard.py
 """
@@ -16,6 +17,7 @@ import streamlit as st
 from pydantic import ValidationError
 
 import dash_helpers as h
+import repro_tab
 from fairfl.core.engine import Simulator
 from fairfl.core.registry import get_strategy, list_strategies
 from fairfl.fairness.scheme import FairnessScheme
@@ -121,7 +123,7 @@ with st.sidebar:
     st.header("Fairness scheme")
     scheme = scheme_form(FairnessScheme.model_validate(base["fairness"]))
 
-run_tab, cmp_tab = st.tabs(["Run", "Compare"])
+run_tab, cmp_tab, repro = st.tabs(["Run", "Compare", "Reproduction"])
 
 # ---------------- run ----------------
 with run_tab:
@@ -210,3 +212,7 @@ with cmp_tab:
         st.dataframe(h.rank_table(table, metric))
         with st.expander("Full table"):
             st.dataframe(table, hide_index=True)
+
+# ---------------- reproduction ----------------
+with repro:
+    repro_tab.render()
