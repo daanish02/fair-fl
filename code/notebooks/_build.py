@@ -44,6 +44,7 @@ SUITES = [
     "suites/fedmut_cifar10_cnn.yaml",
     "suites/fedcda_fmnist.yaml",
     "suites/fedfdp_mnist.yaml",        # 2 runs, 776 DP rounds; ~70 s/round on a laptop CPU, run it here
+    "suites/median_mnist.yaml",        # 6 runs, 10^4 full-batch rounds each (Chen et al. Fig. 2)
 ]
 # Optional: restrict to runs whose name contains one of these strings (e.g. ["d0.1", "iid"]); empty = all.
 ONLY = []

@@ -41,12 +41,22 @@ def apply_overrides(cfg: ExperimentConfig, overrides: list[str]) -> ExperimentCo
 
 def psi(evals) -> float | None:
     """FedFDP Eq. 2: sum_i p_i (F_i - F)^2 with p_i proportional to data size, F = sum_i p_i F_i."""
+    evals = [e for e in (evals or []) if e.num_samples]
     if not evals:
         return None
     n = np.array([e.num_samples for e in evals], float)
     f = np.array([e.loss for e in evals])
     p = n / n.sum()
     return float((p * (f - (p * f).sum()) ** 2).sum())
+
+
+def balanced_accuracy(c) -> float | None:
+    """Binary tasks: (TPR + TNR) / 2 pooled over groups (FairWeight's metric)."""
+    n = np.array(c.n, float).sum(0)
+    cor = np.array(c.correct, float).sum(0)
+    if len(n) != 2 or n.min() == 0:
+        return None
+    return float((cor[1] / n[1] + cor[0] / n[0]) / 2)
 
 
 def _nan(fn, values) -> float | None:
@@ -68,6 +78,8 @@ def summarise_run(logs: list[RoundLog], scheme: FairnessScheme) -> dict[str, Any
     out: dict[str, Any] = {
         "final_accuracy": last.global_accuracy,
         "final_global_test_accuracy": last.global_test.accuracy if last.global_test else None,
+        "final_global_test_ba": balanced_accuracy(last.global_test.groups) if last.global_test else None,
+        "final_global_test_dp": dp_gap(last.global_test.groups) if last.global_test else None,
         # FedMut / FedCDA report mean +- std over the last 10 evaluations of the global model.
         "global_test_acc_last10_mean": _last10(logs, np.mean),
         "global_test_acc_last10_std": _last10(logs, np.std),

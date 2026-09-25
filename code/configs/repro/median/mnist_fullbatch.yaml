@@ -1,0 +1,17 @@
+# Chen et al. (NeurIPS 2020) Fig. 2 setting, MNIST. Spec: docs/repro/median.md. The paper's NN experiments use
+# signSGD with majority vote (= sign of the median of local gradients); medianSGD is run as the analogue predicted
+# by its Theorem 6. 10 clients with exclusive data for one or two classes (10 label-sorted shards of 6000), one
+# full-batch local gradient step per round (FedSGD regime), 784-128-10 MLP, constant lr, 10^4 rounds.
+# Noise is added to each client's gradient before the sign / median (Algorithms 3 and 4).
+# Deviation: MNIST is standardised (mean/std) rather than scaled to [0, 1].
+name: median_mnist
+seed: 0
+data: {name: mnist, source: train, global_test: official, num_clients: 10, partition_on: shards, shards_per_client: 1,
+       test_fraction: 0.0}
+model: {kind: mlp, hidden: [128]}
+train: {rounds: 10000, clients_per_round: 1.0, local_epochs: 1, batch_size: 100000, lr: 0.1, eval_every: 250,
+        checkpoint_every: 250}
+strategy: {name: median, params: {sigma: 0.0}}
+fairness:
+  status: {benefit: accuracy, level: clients, accumulation: cumulative}
+  scope: {kind: anytime}

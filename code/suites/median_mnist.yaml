@@ -1,0 +1,16 @@
+# Chen et al. Fig. 2 (MNIST, heterogeneous): mean (FedSGD target), signSGD with/without noise, medianSGD
+# with/without noise. Median noise is on the update scale: sigma = lr * b (lr 0.1). GPU (Colab) recommended.
+name: repro_median
+runs:
+  - config: configs/repro/median/mnist_fullbatch.yaml
+    set: {name: median_mnist_mean, strategy: {name: fedavg, params: {}}}
+  - config: configs/repro/median/mnist_fullbatch.yaml
+    set: {name: median_mnist_signsgd_b0, strategy: {name: signsgd, params: {step: 0.001, b: 0.0}}}
+  - config: configs/repro/median/mnist_fullbatch.yaml
+    set: {name: median_mnist_signsgd_b1e-3, strategy: {name: signsgd, params: {step: 0.001, b: 0.001}}}
+  - config: configs/repro/median/mnist_fullbatch.yaml
+    set: {name: median_mnist_signsgd_b1e-5, strategy: {name: signsgd, params: {step: 0.001, b: 0.00001}}}
+  - config: configs/repro/median/mnist_fullbatch.yaml
+    set: {name: median_mnist_median_b0, strategy: {name: median, params: {sigma: 0.0}}}
+  - config: configs/repro/median/mnist_fullbatch.yaml
+    set: {name: median_mnist_median_b1e-3, strategy: {name: median, params: {sigma: 0.0001}}}

@@ -127,6 +127,18 @@ class Logistic(nn.Module):
         return torch.cat([torch.zeros_like(z), z], dim=1)
 
 
+class FairWeightDNN(nn.Module):
+    """FairWeight's model: Linear(d,64)-ReLU-Linear(64,32)-ReLU-Linear(32,1)-Sigmoid, exposed as logits [0, z]."""
+
+    def __init__(self, in_dim: int):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(in_dim, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 1))
+
+    def forward(self, x):
+        z = self.net(x.flatten(1))
+        return torch.cat([torch.zeros_like(z), z], dim=1)
+
+
 class CNNMnist(nn.Module):
     """CNNMnist from the FCFL repo (models/Nets.py): conv10-pool-conv20-dropout2d-pool-fc50-dropout-out."""
 
@@ -166,6 +178,8 @@ def build_model(cfg: ModelConfig, input_shape: tuple[int, ...], num_classes: int
         if len(input_shape) != 3:
             raise ValueError(f"model {cfg.kind!r} needs image data, got input shape {input_shape}")
         return BUILDERS[cfg.kind](input_shape, num_classes)
+    if cfg.kind == "fw_dnn":
+        return FairWeightDNN(math.prod(input_shape))
     if cfg.kind == "logistic":
         return Logistic(math.prod(input_shape))
     if cfg.kind == "cnn_mnist":

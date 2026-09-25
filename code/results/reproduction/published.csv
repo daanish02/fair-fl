@@ -66,3 +66,27 @@ FedCDA,ICLR 2024,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedavg,accuracy
 FedCDA,ICLR 2024,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedcda,accuracy_last10_pct,74.96,global_test_acc_last10_mean,100,Table 1 p.8
 FedFDP,ACNS 2026,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavgdp,accuracy_pct,93.40,final_global_test_accuracy,100,Table 3 p.15
 FedFDP,ACNS 2026,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,final_global_test_accuracy,100,Table 3 p.15 (Table 5: 94.13)
+FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,accuracy,0.77,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,balanced_accuracy,0.79,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,dp,0.409,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fairweight,accuracy,0.71,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fairweight,balanced_accuracy,0.75,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fairweight,dp,0.01,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,bank R3C DP-constrained,fairweight_r3c_bank_fedavg,accuracy,0.87,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,bank R3C DP-constrained,fairweight_r3c_bank_fedavg,balanced_accuracy,0.79,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,bank R3C DP-constrained,fairweight_r3c_bank_fedavg,dp,0.076,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,bank R3C DP-constrained,fairweight_r3c_bank_fairweight,accuracy,0.85,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,bank R3C DP-constrained,fairweight_r3c_bank_fairweight,balanced_accuracy,0.83,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,bank R3C DP-constrained,fairweight_r3c_bank_fairweight,dp,0.011,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,default R3C DP-constrained,fairweight_r3c_default_fedavg,accuracy,0.78,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,default R3C DP-constrained,fairweight_r3c_default_fedavg,balanced_accuracy,0.69,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,default R3C DP-constrained,fairweight_r3c_default_fedavg,dp,0.053,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,default R3C DP-constrained,fairweight_r3c_default_fairweight,accuracy,0.75,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,default R3C DP-constrained,fairweight_r3c_default_fairweight,balanced_accuracy,0.71,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,default R3C DP-constrained,fairweight_r3c_default_fairweight,dp,0.015,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,law R3C DP-constrained,fairweight_r3c_law_fedavg,accuracy,0.88,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,law R3C DP-constrained,fairweight_r3c_law_fedavg,balanced_accuracy,0.72,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,law R3C DP-constrained,fairweight_r3c_law_fedavg,dp,0.037,final_global_test_dp,1,Table II p.9
+FairWeight,IEEE TSC 2026,law R3C DP-constrained,fairweight_r3c_law_fairweight,accuracy,0.83,final_global_test_accuracy,1,Table II p.9
+FairWeight,IEEE TSC 2026,law R3C DP-constrained,fairweight_r3c_law_fairweight,balanced_accuracy,0.78,final_global_test_ba,1,Table II p.9
+FairWeight,IEEE TSC 2026,law R3C DP-constrained,fairweight_r3c_law_fairweight,dp,0.005,final_global_test_dp,1,Table II p.9

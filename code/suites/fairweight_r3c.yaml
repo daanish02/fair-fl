@@ -1,0 +1,92 @@
+# FairWeight Table II (R3C, DP-constrained): FedAvg row vs FairWeight on Adult / Bank / Default / Law; seed 0.
+# CPU only (small tabular data; not in the Colab notebook).
+name: repro_fairweight
+runs:
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_adult_fedavg
+    data.name: fw_adult
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: none
+        aggregation: mean
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_adult_fairweight
+    data.name: fw_adult
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: dp
+        aggregation: fairweight
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_bank_fedavg
+    data.name: fw_bank
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: none
+        aggregation: mean
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_bank_fairweight
+    data.name: fw_bank
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: dp
+        aggregation: fairweight
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_default_fedavg
+    data.name: fw_default
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: none
+        aggregation: mean
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_default_fairweight
+    data.name: fw_default
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: dp
+        aggregation: fairweight
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_law_fedavg
+    data.name: fw_law
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: none
+        aggregation: mean
+- config: configs/repro/fairweight/r3c.yaml
+  seeds:
+  - 0
+  set:
+    name: fairweight_r3c_law_fairweight
+    data.name: fw_law
+    strategy:
+      name: fairweight_official
+      params:
+        fair_loss: dp
+        aggregation: fairweight

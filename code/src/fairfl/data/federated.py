@@ -66,6 +66,10 @@ def build_from_split_file(cfg: DataConfig, seed: int) -> FederatedData:
 def build_federated(cfg: DataConfig, seed: int) -> FederatedData:
     if cfg.name == "split_file":
         return build_from_split_file(cfg, seed)
+    if cfg.name.startswith("fw_"):
+        from fairfl.data.fairweight_data import build_fairweight
+
+        return build_fairweight(cfg.name[3:], cfg.root, cfg.num_clients)
     rng = np.random.default_rng(seed)
     kw = ({"target_attr": cfg.target_attr, "sensitive_attr": cfg.sensitive_attr, "subsample": cfg.subsample}
           if cfg.name == "celeba" else {})

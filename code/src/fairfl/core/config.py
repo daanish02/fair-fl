@@ -10,7 +10,7 @@ from fairfl.fairness.scheme import FairnessScheme
 
 
 class DataConfig(BaseModel):
-    name: Literal["adult", "mnist", "synthetic", "split_file", "fmnist", "cifar10", "cifar100", "celeba",
+    name: Literal["adult", "mnist", "synthetic", "split_file", "fw_adult", "fw_bank", "fw_default", "fw_law", "fmnist", "cifar10", "cifar100", "celeba",
                   "bank", "default", "law", "kdd"] = "adult"
     num_clients: int = Field(10, ge=2)
     alpha: float = Field(0.5, gt=0.0, description="Dirichlet concentration; smaller = more heterogeneous.")
@@ -44,7 +44,7 @@ class DataConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    kind: Literal["logistic", "mlp", "mlp_dropout", "cnn", "cnn_mnist", "logreg", "cnn_fmnist", "cnn_cifar", "resnet18", "vgg16", "cnn_celeba"] = "mlp"
+    kind: Literal["logistic", "fw_dnn", "mlp", "mlp_dropout", "cnn", "cnn_mnist", "logreg", "cnn_fmnist", "cnn_cifar", "resnet18", "vgg16", "cnn_celeba"] = "mlp"
     hidden: list[int] = Field(default_factory=lambda: [32])
     init_from: str | None = Field(None, description="Load initial parameters (flat tensor or state_dict) from file.")
 

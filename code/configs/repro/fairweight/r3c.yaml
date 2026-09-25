@@ -1,0 +1,17 @@
+# FairWeight (Kasyap et al., IEEE TSC 2026) Table II: R3C (random split, 3 clients), 50 rounds, DP-constrained local
+# optimisation. Spec: docs/repro/fairweight.md. Port of the authors' released code (strategy fairweight_official):
+# their preprocessing and random_state=42 splits, DNN 64-32-1, Adam 0.001 reset each round, 15 full-batch steps,
+# weighted BCE (pos_weight 10, double sigmoid as in the code), DP loss alpha 100, Shapley WI (25% zeroing,
+# 100 repeats, batches of 40, cap 1000, top 750 per set), scores (1.5 s)^100 with the code's 0.66/0.33 table.
+# Metrics on the 20% global test set: accuracy, balanced accuracy, DP (|P(yhat=1|a=0) - P(yhat=1|a=1)|).
+# FedAvg row: same client training without the fairness loss, unweighted mean aggregation (the paper does not
+# specify its FedAvg configuration). The paper averages 10 unseeded runs; we run seed 0.
+name: fairweight_r3c
+seed: 0
+data: {name: fw_adult, num_clients: 3, test_fraction: 0.0}
+model: {kind: fw_dnn}
+train: {rounds: 50, eval_every: 5, checkpoint_every: 5}
+strategy: {name: fairweight_official, params: {fair_loss: dp, aggregation: fairweight}}
+fairness:
+  status: {benefit: dp, level: global, accumulation: cumulative}
+  scope: {kind: anytime}

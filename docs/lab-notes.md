@@ -167,3 +167,51 @@ The paper reports no seeds or standard deviations. This counts as "claim reprodu
   - Any rerun (`fairfl batch` locally, Run all on Colab) resumes after the last checkpoint, and the checkpoint is deleted when the run finishes.
   - `tests/test_checkpoint.py` checks that an interrupted-and-resumed FCFL run ends with *identical* parameters to an uninterrupted one.
 - **Keep-awake:** `fairfl batch` also asks Windows not to idle-sleep while a suite runs. It cannot prevent manual sleep, closing the lid, or a shutdown.
+
+---
+
+## 2026-09-25 — Median (Chen et al.) Fig. 1 reproduced exactly; MNIST part moved to Colab
+
+**For:** the reproduction table, plus the motivation that a robust median needs noise under heterogeneity.
+
+- **The paper's only medianSGD experiment is the 1-D toy (Fig. 1):** three nodes with f_i = (x - a_i)^2 / 2, a = (1, 2, 10), step 0.001, x0 = 0.0005. Its neural-network experiments (Fig. 2-3) use signSGD with majority vote, which the paper shows is the sign of the median.
+- **Toy results** (`code/src/fairfl/experiments/median_toy.py`, saved to `code/results/reproduction/median_toy.jsonl`, tested in `tests/test_median_toy.py`):
+
+  | Aggregation | final x | true (mean) gradient |
+  |---|---|---|
+  | mean (target) | 4.333 (= 13/3) | 0.000 |
+  | median | 2.000 | -2.333 (= -7/3) |
+  | signSGD | 2.000 | -2.333 |
+  | median + noise b = 1 / 5 / 10 / 20 (10^5 steps) | 2.20 / 3.81 / 4.27 / 4.45 | -2.14 / -0.53 / -0.06 / +0.11 |
+
+  This matches Fig. 1 exactly: both median-based methods stall where the median gradient is zero, while the true gradient stays at 7/3. Noise before the median closes the gap, and too much noise overshoots (Theorem 6's trade-off).
+- **The MNIST replication runs on Colab** (`code/suites/median_mnist.yaml`): 10 clients, each holding one or two exclusive classes; one full-batch step per round; 784-128-10 MLP; 10^4 rounds.
+  - Variants: mean, signSGD with b in {0, 1e-3, 1e-5}, and medianSGD with b in {0, 1e-3}.
+  - Paper readings (Fig. 2, from the plot): without noise, about 0.35-0.4 accuracy; with noise or sub-sampling, about 0.85-0.9.
+  - The signSGD server step (0.001) is our choice; the paper tuned it over {1, 0.1, 0.01, 0.001} without stating the result.
+
+---
+
+## 2026-09-25 — FairWeight: official-code port; the FedAvg row matches on BA and DP but not accuracy
+
+**For:** the reproduction table, plus a caveat on FairWeight's metrics.
+
+- **Setup:** `strategies/fairweight_official.py` and `data/fairweight_data.py` port the authors' released code line by line. That includes the quirks that change results:
+  - a double sigmoid in the loss, with pos_weight 10;
+  - Adam re-created each round, 15 full-batch steps;
+  - the DP loss with its constraint-matrix bug;
+  - the Shapley routine with 25% zeroing, 100 repeats, batches of 40, top 750;
+  - the hard-coded 0.66 / 0.33 score table for 3 clients.
+
+    The table matters: with beta2 = 100, 0.66 instead of 2/3 changes a weight by about 3x.
+- **FedAvg row, Adult R3C** (the paper averages 10 unseeded runs; we ran 5 seeds for this row):
+
+  | Metric | Paper | Ours, mean over seeds | Ours, range over seeds |
+  |---|---|---|---|
+  | Accuracy | 0.77 | 0.70 | 0.66-0.73 |
+  | Balanced accuracy | 0.79 | 0.78 | 0.75-0.80 |
+  | DP | 0.409 | 0.34 | 0.24-0.40 |
+
+  Balanced accuracy matches, and DP is within the (large) seed variance. Accuracy is about 6 points low. The paper never states how its FedAvg baseline was configured, and with pos_weight 10 the classifier trades accuracy for recall. So the gap may come from the baseline configuration rather than the port.
+- **Results for FairWeight itself** (Adult, Bank, Default, Law; seed 0) are pending.
+- **Table III (the FACE/ATE loss)** is not ported. It needs the authors' propensity-matched potential outcomes, which their code misaligns (see `docs/repro/fairweight.md` section 4).
