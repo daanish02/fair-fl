@@ -212,6 +212,23 @@ else:
 """)
 
 code("""
+# FairRFL Table III, CIFAR-10 (Augello et al., IEEE TETC 2026): official-code port, 8 methods x 0/10/20/30% selfish
+# clients = 32 runs of 30 rounds. Too slow on a laptop CPU (~50 min per run). Finished runs are skipped
+# (looked up by name in results/runs.jsonl), so after a disconnect just run this cell again.
+RUN_FAIRRFL = True
+if RUN_FAIRRFL:
+    import torchvision
+    torchvision.datasets.CIFAR10(str(DATA), download=True)   # extract once before the workers start
+    cmd = [sys.executable, "-u", "-m", "fairfl.experiments.fairrfl_official", "--root", str(DATA),
+           "--workers", str(PARALLEL), "--threads", "1"]
+    env = {**os.environ, "PYTHONPATH": str(REPO / "code" / "src")}
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
+    for line in proc.stdout:          # live: one line per worker every 10 rounds, one per finished run
+        print(line, end="", flush=True)
+    assert proc.wait() == 0, "FairRFL runner failed (see the traceback above)"
+""")
+
+code("""
 import pandas as pd
 
 rows = []
