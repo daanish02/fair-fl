@@ -188,7 +188,18 @@ if PARALLEL > 1:
                          if not ONLY or any(o in r.get("set", {}).get("name", "") for o in ONLY)]
         tmp = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
         yaml.safe_dump(suite, tmp); tmp.close()
-        run_suite(tmp.name, workers=PARALLEL, threads=1, root=str(RESULTS))
+        # run the suite in a background thread and print each active run's latest log line every minute
+        import threading
+        th = threading.Thread(target=run_suite, args=(tmp.name,), kwargs=dict(workers=PARALLEL, threads=1, root=str(RESULTS)))
+        th.start()
+        while th.is_alive():
+            th.join(timeout=60)
+            now = time.time()
+            for log in sorted(RESULTS.glob("*/seed*/log.txt")):
+                if now - log.stat().st_mtime < 180 and not (log.parent / "summary.json").exists():
+                    lines = [l for l in log.read_text(errors="ignore").splitlines() if "round" in l]
+                    if lines:
+                        print(time.strftime("%H:%M"), lines[-1].strip(), flush=True)
 else:
     finished = run_all(EXPERIMENTS)
 """)
