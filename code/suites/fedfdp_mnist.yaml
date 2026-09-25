@@ -1,0 +1,9 @@
+# FedFDP Table 3 (MNIST, eps = 3.52): FedAvg with DP-SGD (lambda = 0) vs FedFDP (lambda = 0.01); seed 0.
+name: repro_fedfdp
+runs:
+  - config: configs/repro/fedfdp/mnist_dp.yaml
+    seeds: [0]
+    set: {name: fedfdp_mnist_fedavgdp, strategy: {name: fedfdp, params: {lam: 0.0}}}
+  - config: configs/repro/fedfdp/mnist_dp.yaml
+    seeds: [0]
+    set: {name: fedfdp_mnist_fedfdp, strategy: {name: fedfdp, params: {lam: 0.01}}}

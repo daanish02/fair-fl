@@ -1,0 +1,15 @@
+# FCFL (Wang et al., ECML-PKDD 2024) Table 2, MNIST. Spec: docs/repro/fcfl.md.
+# Paper: 100 clients, 10%/round, batch 64, 1 local epoch, 2000 rounds, 5 seeds, FCFL alpha 0.3, r 0.4.
+# Official code (github.com/wlffffff/FCFL): CNNMnist, SGD lr 0.1 + client momentum 0.5, 200 label shards (2 per
+# client) from the official train set, per-client unshuffled 80/10/10 train/val/test slices.
+# Metrics: Accuracy = official 10k test set; variance / best 10% / worst 10% over the 100 local test slices.
+name: fcfl_mnist_shards
+seed: 0
+data: {name: mnist, source: train, global_test: official, num_clients: 100, partition_on: shards,
+       shards_per_client: 2, client_split: ordered, test_fraction: 0.1, val_fraction: 0.1}
+model: {kind: cnn_mnist}
+train: {rounds: 2000, clients_per_round: 0.1, local_epochs: 1, batch_size: 64, lr: 0.1, momentum: 0.5, eval_every: 50}
+strategy: {name: fcfl, params: {eta: 0.3, random_fraction: 0.4}}
+fairness:
+  status: {benefit: accuracy, level: clients, accumulation: cumulative}
+  scope: {kind: anytime}

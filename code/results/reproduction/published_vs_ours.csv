@@ -1,0 +1,24 @@
+paper,setting,run_name,metric,published,source,ours,diff,status
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,accuracy_pct,95.96,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,variance_pct2,15.06,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,worst10_pct,87.47,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,best10_pct,100.00,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,accuracy_pct,96.09,Table 2 p.398 (q=0.2),,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,variance_pct2,12.58,Table 2 p.398 (q=0.2),,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,worst10_pct,88.40,Table 2 p.398 (q=0.2),,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,accuracy_pct,96.06,Table 2 p.398 (alpha=0.3 r=0.4),,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,variance_pct2,11.03,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,worst10_pct,89.17,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,best10_pct,100.00,Table 2 p.398,,,NOT RUN
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_fedavg,accuracy,0.8381,Table 1 p.6,0.8415,+0.0034,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_fedavg,local_dp_max,0.1922,Table 1 p.6,0.1853,-0.0069,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_fedavg,global_dp,0.1759,Table 1 p.6,0.1662,-0.0097,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_g,accuracy,0.8218,Table 1 p.6,0.8268,+0.0050,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_g,local_dp_max,0.0889,Table 1 p.6,0.0208,-0.0681,GAP
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_g,global_dp,0.0183,Table 1 p.6,0.0110,-0.0073,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_l,accuracy,0.8252,Table 1 p.6,0.8245,-0.0007,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_l,local_dp_max,0.0367,Table 1 p.6,0.0258,-0.0109,GAP
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_l,global_dp,0.0468,Table 1 p.6,0.0128,-0.0340,GAP
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,accuracy,0.8214,Table 1 p.6,0.8237,+0.0023,OK
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,local_dp_max,0.0489,Table 1 p.6,0.0291,-0.0198,GAP
+LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,global_dp,0.0204,Table 1 p.6,0.0064,-0.0140,GAP

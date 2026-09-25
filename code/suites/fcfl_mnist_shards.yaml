@@ -1,0 +1,12 @@
+# FCFL Table 2 (MNIST): FedAvg, q-FedAvg (paper's best q = 0.2), FCFL (alpha 0.3, r 0.4); 1 seed (user: one run per config is enough).
+name: repro_fcfl
+runs:
+  - config: configs/repro/fcfl/mnist_shards.yaml
+    seeds: [0]
+    set: {name: fcfl_mnist_shards_fedavg, strategy: {name: fedavg, params: {}}}
+  - config: configs/repro/fcfl/mnist_shards.yaml
+    seeds: [0]
+    set: {name: fcfl_mnist_shards_qffl, strategy: {name: qffl, params: {q: 0.2}}}
+  - config: configs/repro/fcfl/mnist_shards.yaml
+    seeds: [0]
+    set: {name: fcfl_mnist_shards_fcfl, strategy: {name: fcfl, params: {eta: 0.3, random_fraction: 0.4}}}

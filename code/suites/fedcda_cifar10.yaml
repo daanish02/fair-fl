@@ -1,0 +1,183 @@
+# FedCDA Table 1 (cifar10): FedAvg vs FedCDA, shards 2/4/8 and Dirichlet 0.1/0.3/0.5; seed 0. GPU. ResNet-18 uses GroupNorm (paper does not state its normalisation).
+name: repro_fedcda
+runs:
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_dir0.1_fedavg
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedavg
+      params: {}
+    data.partition_on: label
+    data.alpha: 0.1
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_dir0.1_fedcda
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedcda
+      params:
+        K: 3
+        num_batches: 3
+        smoothness: 1.0
+        warmup: 50
+    data.partition_on: label
+    data.alpha: 0.1
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_dir0.3_fedavg
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedavg
+      params: {}
+    data.partition_on: label
+    data.alpha: 0.3
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_dir0.3_fedcda
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedcda
+      params:
+        K: 3
+        num_batches: 3
+        smoothness: 1.0
+        warmup: 50
+    data.partition_on: label
+    data.alpha: 0.3
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_dir0.5_fedavg
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedavg
+      params: {}
+    data.partition_on: label
+    data.alpha: 0.5
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_dir0.5_fedcda
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedcda
+      params:
+        K: 3
+        num_batches: 3
+        smoothness: 1.0
+        warmup: 50
+    data.partition_on: label
+    data.alpha: 0.5
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_shards2_fedavg
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedavg
+      params: {}
+    data.partition_on: shards
+    data.shards_per_client: 2
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_shards2_fedcda
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedcda
+      params:
+        K: 3
+        num_batches: 3
+        smoothness: 1.0
+        warmup: 50
+    data.partition_on: shards
+    data.shards_per_client: 2
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_shards4_fedavg
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedavg
+      params: {}
+    data.partition_on: shards
+    data.shards_per_client: 4
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_shards4_fedcda
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedcda
+      params:
+        K: 3
+        num_batches: 3
+        smoothness: 1.0
+        warmup: 50
+    data.partition_on: shards
+    data.shards_per_client: 4
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_shards8_fedavg
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedavg
+      params: {}
+    data.partition_on: shards
+    data.shards_per_client: 8
+- config: configs/repro/fedcda/fmnist_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedcda_cifar10_shards8_fedcda
+    data.name: cifar10
+    model:
+      kind: resnet18
+    strategy:
+      name: fedcda
+      params:
+        K: 3
+        num_batches: 3
+        smoothness: 1.0
+        warmup: 50
+    data.partition_on: shards
+    data.shards_per_client: 8

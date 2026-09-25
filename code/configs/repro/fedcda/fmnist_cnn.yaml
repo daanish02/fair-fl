@@ -1,0 +1,17 @@
+# FedCDA (Wang et al., ICLR 2024) Table 1. Spec: docs/repro/fedcda.md. No official code.
+# 20 clients, 20% per round (4), SGD lr 1e-3, momentum 1e-4 (as printed), weight decay 1e-5, batch 64,
+# 20 local epochs, 200 rounds; FedCDA: K = 3 cached models, B = 3 batches, L = 1, first 50 rounds FedAvg.
+# Partitions: shards S in {2, 4, 8} or label-Dirichlet alpha in {0.1, 0.3, 0.5}. Accuracy of the global model on the
+# official test set, mean +- std over the final 10 rounds (paper: also over 2 runs; we run 1).
+# FMNIST model: McMahan CNN (conv5x5 32, pool, conv5x5 64, pool, fc 512, fc 10) = kind cnn_fmnist.
+name: fedcda_fmnist_cnn
+seed: 0
+data: {name: fmnist, source: train, global_test: official, num_clients: 20, test_fraction: 0.0,
+       partition_on: label, alpha: 0.5, min_samples: 10}
+model: {kind: cnn_fmnist}
+train: {rounds: 200, clients_per_round: 0.2, local_epochs: 20, batch_size: 64, lr: 0.001, momentum: 0.0001,
+        weight_decay: 0.00001, eval_every: 1}
+strategy: {name: fedcda, params: {K: 3, num_batches: 3, smoothness: 1.0, warmup: 50}}
+fairness:
+  status: {benefit: accuracy, level: clients, accumulation: cumulative}
+  scope: {kind: anytime}

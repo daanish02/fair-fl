@@ -1,0 +1,107 @@
+# FedMut Table 1 (CIFAR-10): FedAvg vs FedMut at d = 0.1 / 0.5 / 1.0 / IID; seed 0. GPU recommended.
+name: repro_fedmut
+runs:
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_d0.1_fedavg
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta0.1.json
+    strategy:
+      name: fedavg
+      params: {}
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_d0.1_fedmut
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta0.1.json
+    strategy:
+      name: fedmut
+      params:
+        radius: 4.0
+        mut_acc_rate: 0.3
+        mut_bound: 50
+        weighted: false
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_d0.5_fedavg
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta0.5.json
+    strategy:
+      name: fedavg
+      params: {}
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_d0.5_fedmut
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta0.5.json
+    strategy:
+      name: fedmut
+      params:
+        radius: 4.0
+        mut_acc_rate: 0.3
+        mut_bound: 50
+        weighted: false
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_d1.0_fedavg
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta1.0.json
+    strategy:
+      name: fedavg
+      params: {}
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_d1.0_fedmut
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta1.0.json
+    strategy:
+      name: fedmut
+      params:
+        radius: 4.0
+        mut_acc_rate: 0.3
+        mut_bound: 50
+        weighted: false
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_iid_fedavg
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_iid.json
+    strategy:
+      name: fedavg
+      params: {}
+- config: configs/repro/fedmut/cifar10_cnn.yaml
+  seeds:
+  - 0
+  set:
+    name: fedmut_cifar10_cnn_cifar_iid_fedmut
+    model:
+      kind: cnn_cifar
+    data.partition_file: assets/partitions/fedmut/cifar10_100_iid.json
+    strategy:
+      name: fedmut
+      params:
+        radius: 4.0
+        mut_acc_rate: 0.3
+        mut_bound: 50
+        weighted: false

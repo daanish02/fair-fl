@@ -1,0 +1,11 @@
+# LoGoFair Table 1 (Adult, alpha 0.5, DP): FedAvg (official pre-trained model) and LoGoFair g / l / l&g.
+name: repro_logofair
+runs:
+  - config: configs/repro/logofair/adult_a0.5.yaml
+    set: {name: logofair_adult_a0.5_fedavg, strategy: {name: fedavg, params: {}}}
+  - config: configs/repro/logofair/adult_a0.5.yaml
+    set: {name: logofair_adult_a0.5_g, strategy: {name: logofair_official, params: {mode: g, delta_g: 0.01, delta_l: 0.01}}}
+  - config: configs/repro/logofair/adult_a0.5.yaml
+    set: {name: logofair_adult_a0.5_l, strategy: {name: logofair_official, params: {mode: l, delta_g: 0.01, delta_l: 0.01}}}
+  - config: configs/repro/logofair/adult_a0.5.yaml
+    set: {name: logofair_adult_a0.5_lg, strategy: {name: logofair_official, params: {mode: lg, delta_g: 0.01, delta_l: 0.01}}}

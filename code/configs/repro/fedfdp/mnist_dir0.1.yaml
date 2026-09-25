@@ -1,0 +1,17 @@
+# FedFDP (Ling et al., ACNS 2026) Table 3, MNIST, eps = 3.52. Spec: docs/repro/fedfdp.md.
+# Dir(0.1) label skew, 10 clients, all participate every round; McMahan CNN (conv5x5-32, pool, conv5x5-64, pool,
+# FC-512, FC-10); one DP-SGD step per round on a Poisson batch q = 0.05; eta = 1.0; C = 0.1; sigma = 2;
+# loss upload sigma_l = 5, C_l^0 = 2.5; delta = 1e-5. T = 776 rounds = eps 3.52 under the gradient-only RDP
+# accountant, which reproduces the paper's own Fig. 4 round counts (tests/test_privacy.py).
+# Unstated in the paper: lambda for MNIST (1e-2, Fig. 2 FMNIST optimum), per-client test split, seeds.
+# Accuracy on the official MNIST test set; Psi on each client's training data (Eq. 2).
+name: fedfdp_mnist_dir0.1
+seed: 0
+data: {name: mnist, source: train, global_test: official, num_clients: 10, partition_on: label, alpha: 0.1,
+       test_fraction: 0.1, min_samples: 20}
+model: {kind: cnn_fmnist}
+train: {rounds: 776, clients_per_round: 1.0, lr: 1.0, eval_every: 50}
+strategy: {name: fedfdp, params: {lam: 0.01, clip: 0.1, sigma: 2.0, sigma_loss: 5.0, loss_clip_init: 2.5, q: 0.05}}
+fairness:
+  status: {benefit: accuracy, level: clients, accumulation: cumulative}
+  scope: {kind: anytime}

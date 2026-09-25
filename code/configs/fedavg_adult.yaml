@@ -1,0 +1,10 @@
+name: fedavg_adult
+seed: 0
+data: {name: adult, num_clients: 10, alpha: 0.5, partition_on: sensitive}
+model: {kind: mlp, hidden: [32]}
+train: {rounds: 50, clients_per_round: 1.0, local_epochs: 1, batch_size: 64, lr: 0.05}
+strategy: {name: fedavg}
+fairness:
+  status: {benefit: dp, level: global, accumulation: cumulative}
+  scope: {kind: anytime}
+  epsilon: 0.05

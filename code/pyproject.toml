@@ -1,0 +1,35 @@
+[project]
+name = "fairfl"
+version = "0.1.0"
+description = "Custom federated learning testbed for non-Markovian fairness research"
+authors = [
+    { name = "Danish Ahmed", email = "daanish1092@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "pydantic>=2.7",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.9.1",
+    "scipy>=1.18.1",
+    "streamlit>=1.64.0",
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "typer>=0.27.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[project.scripts]
+fairfl = "fairfl.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
