@@ -97,9 +97,11 @@ class ClientAlgorithm(ABC):
                               weight_decay=self.cfg.weight_decay)
         dev = model_device(model)
         model.train()
-        last = []
+        # Last-epoch loss is summed on the device and read once: a per-batch .item() forces a GPU sync every step.
+        last_sum, last_n = torch.zeros((), dtype=torch.float64, device=dev), 0
         for epoch in range(int(ins.config.get("local_epochs", self.cfg.local_epochs))):
-            last = []
+            last_sum.zero_()
+            last_n = 0
             for idx in batches(len(train), self.cfg.batch_size, gen):
                 X, y, a = train.X[idx].to(dev), train.y[idx].to(dev), train.a[idx].to(dev)
                 if train.augment:
@@ -108,8 +110,9 @@ class ClientAlgorithm(ABC):
                 loss = self.batch_loss(model, X, y, a, ins, state)
                 loss.backward()
                 opt.step()
-                last.append(loss.item())
-        metrics = {"loss_before": loss_before, "train_loss": sum(last) / max(len(last), 1)}
+                last_sum += loss.detach().double()
+                last_n += 1
+        metrics = {"loss_before": loss_before, "train_loss": float(last_sum) / max(last_n, 1)}
         if ins.config.get("report_train_acc"):
             metrics["train_acc"] = evaluate(model, train, data.client_id).accuracy
         return FitRes(client_id=data.client_id, params=get_params(model), num_samples=len(train), metrics=metrics)

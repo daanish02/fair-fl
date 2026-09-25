@@ -45,6 +45,9 @@ SUITES = [
 ]
 # Optional: restrict to runs whose name contains one of these strings (e.g. ["d0.1", "iid"]); empty = all.
 ONLY = []
+# Experiments run at the same time on the one GPU. The small CNNs leave the GPU mostly idle, so 2 roughly doubles
+# throughput (free Colab has 2 CPU cores; use 1 for ResNet-18 suites). Each run then logs to its own log.txt.
+PARALLEL = 2
 """)
 
 code("""
@@ -169,7 +172,22 @@ def run_all(experiments):
 
 EXPERIMENTS = suite_experiments(SUITES, ONLY)
 print(len(EXPERIMENTS), "experiments queued")
-finished = run_all(EXPERIMENTS)
+if PARALLEL > 1:
+    # Parallel worker processes (checkpointed and resumable like the sequential path). Progress per run is in
+    # RESULTS/<name>/seed<k>/log.txt; finished runs are printed here as they complete.
+    import tempfile
+    from fairfl.experiments.batch import run_suite
+    for path in SUITES:
+        suite = yaml.safe_load(open(path))
+        suite["name"] = ""  # outputs go to RESULTS/<name>/seed<k>, same as the sequential path
+        extra = {"data.root": str(DATA), "device": "cuda"}
+        suite["runs"] = [dict(r, set={**r.get("set", {}), **extra}) for r in suite["runs"]
+                         if not ONLY or any(o in r.get("set", {}).get("name", "") for o in ONLY)]
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
+        yaml.safe_dump(suite, tmp); tmp.close()
+        run_suite(tmp.name, workers=PARALLEL, threads=1, root=str(RESULTS))
+else:
+    finished = run_all(EXPERIMENTS)
 """)
 
 code("""
