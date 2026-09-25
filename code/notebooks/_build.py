@@ -216,11 +216,19 @@ code("""
 # clients = 32 runs of 30 rounds. Too slow on a laptop CPU (~50 min per run). Finished runs are skipped
 # (looked up by name in results/runs.jsonl), so after a disconnect just run this cell again.
 RUN_FAIRRFL = True
+# Per-client train size and client lr: the paper/code do not pin these down (defaults: code 200, paper 0.1; with
+# those, FedAvg reached only ~11% vs the paper's 61%). Non-default values get their own run names
+# (..._size500_lr0.1), so they never overwrite the Table III runs. FAIRRFL_ONLY = ["fedavg_s0"] runs just one.
+FAIRRFL_SIZE = 200
+FAIRRFL_LR = 0.1
+FAIRRFL_ONLY = []
 if RUN_FAIRRFL:
     import torchvision
     torchvision.datasets.CIFAR10(str(DATA), download=True)   # extract once before the workers start
     cmd = [sys.executable, "-u", "-m", "fairfl.experiments.fairrfl_official", "--root", str(DATA),
-           "--workers", str(PARALLEL), "--threads", "1"]
+           "--workers", str(PARALLEL), "--threads", "1", "--size", str(FAIRRFL_SIZE), "--lr", str(FAIRRFL_LR)]
+    if FAIRRFL_ONLY:
+        cmd += ["--only", *FAIRRFL_ONLY]
     env = {**os.environ, "PYTHONPATH": str(REPO / "code" / "src")}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
     for line in proc.stdout:          # live: one line per worker every 10 rounds, one per finished run

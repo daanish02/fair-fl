@@ -366,19 +366,27 @@ def main() -> None:
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--root", default="data")
     ap.add_argument("--rounds", type=int, default=30, help="Paper: 30. Lower only for a dry run (not recorded).")
+    # Neither is stated in the paper for CIFAR-10 in a way that pins the code down: --size is the code default
+    # (200 samples per client, so one full-batch step per epoch) and lr 0.1 is the paper's. Non-default values are
+    # appended to the run name (e.g. fairrfl_cifar10_fedavg_s0_size500_lr0.1) so they never overwrite Table III runs.
+    ap.add_argument("--size", type=int, default=200, help="Train samples per client (code --size).")
+    ap.add_argument("--lr", type=float, default=0.1, help="Client learning rate (paper: 0.1 for CIFAR-10).")
+    ap.add_argument("--redo", action="store_true", help="Run even if the name is already in results/runs.jsonl.")
     a = ap.parse_args()
     done = set()
     reg = RESULTS_DIR / "runs.jsonl"
-    if reg.exists():
+    if reg.exists() and not a.redo:
         done = {json.loads(line)["name"] for line in open(reg, encoding="utf-8")}
+    suffix = "" if (a.size, a.lr) == (200, 0.1) else f"_size{a.size}_lr{a.lr:g}"
     jobs = []
     for method, (agg, use_q, dq) in METHODS.items():
         for pct, s in SELFISH.items():
-            name = f"fairrfl_cifar10_{method}_s{pct}"
+            name = f"fairrfl_cifar10_{method}_s{pct}{suffix}"
             if name in done or (a.only and not any(o in name for o in a.only)):
                 continue
             kw = dict(aggregation=agg, fairness=a.q if use_q else 0.0, dq=dq, selfish=s, selfishness=0.7,
-                      estimate_k=not a.no_estimate_k, root=a.root, threads=a.threads, rounds=a.rounds)
+                      estimate_k=not a.no_estimate_k, root=a.root, threads=a.threads, rounds=a.rounds,
+                      size=a.size, lr=a.lr)
             jobs.append((name, kw))
     print(f"[fairrfl] {len(jobs)} runs to do; {a.workers} workers", flush=True)
     keep_awake(True)
