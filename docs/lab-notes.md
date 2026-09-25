@@ -326,3 +326,50 @@ FedAvg's test loss rose from about 2.5 to 6.9 over the run, which means it was o
 - `configs/repro/fedmut/cifar10_cnn.yaml` now uses momentum 0.5. The ResNet-18 suite uses the same config, so it changes too.
 - The engine now stops a run whose global loss is NaN or inf. The summary records `diverged_at_round`, and there is a new test.
 - **Unverified until the Colab rerun.** The old FedMut folders on Drive must be deleted, or they will be skipped as finished.
+
+**Rerun with momentum 0.5** (Colab, 2026-09-26, d = 0.1, seed 0; last-10-evaluation mean ± std):
+
+| Run | Ours | Paper |
+|---|---|---|
+| FedAvg | 40.53 ± 2.52 | 47.93 ± 3.26 |
+| FedMut | 46.33 ± 1.22 | 51.25 ± 1.07 |
+
+- **No NaN, so the divergence is fixed.**
+- **FedMut's gain over FedAvg reproduces:** +5.8 points here vs +3.3 in the paper. FedMut is also steadier (std 1.2 vs 2.5).
+- Both runs are 5-7 points below the paper in absolute terms, and FedAvg's test loss still rises (about 5 at the end). So a shared offset remains.
+- Our "last 10" covers rounds 910-1000, because we evaluate every 10 rounds. The official FedMut code evaluates every round, so its last 10 is rounds 991-1000. This is a minor difference.
+- Registry rows were built from the Colab `summary.json` files (`run_dir: colab:...`). The run folders are in `code/runs/colab/` (gitignored).
+
+---
+
+## 2026-09-26 — G1 preview on FedMut d0.1 (existing logs, no new runs): final-round reporting hides interim unfairness
+
+**For:** an early look at the non-Markovian question before running G1 properly.
+
+**Data:**
+- The two Colab d0.1 runs (FedAvg, FedMut), with 100 evaluations each, one every 10 rounds.
+- Clients hold no test data in this setup, so two proxies stand in for fairness:
+  - *per-class* test accuracy, with classes acting as groups;
+  - *per-client* experienced accuracy, i.e. per-class accuracy weighted by each client's class mix from the shipped partition.
+- Output: `code/runs/colab/g1_preview_d0.1.json`.
+
+**Results** (FedAvg / FedMut):
+
+| Metric | Final round | Last-10 mean | Mean over all rounds |
+|---|---|---|---|
+| Worst-class accuracy | 0.128 / 0.252 | 0.110 / 0.169 | 0.079 / 0.108 |
+| Worst-10% client accuracy | 0.199 / 0.268 | 0.147 / 0.220 | 0.118 / 0.150 |
+| Std across clients | 0.172 / 0.136 | 0.186 / 0.153 | 0.189 / 0.173 |
+
+- **Some class is below 5% accuracy in 35 of 100 evaluations for FedAvg, and 22 of 100 for FedMut.** At any of those checkpoints, a whole class of users gets an almost useless model.
+- Mean change in accuracy between consecutive evaluations: 4.1 points for FedAvg and 3.0 for FedMut. The largest single change is 14.2 and 8.6 points respectively.
+
+**Reading:**
+- **Final-round reporting roughly halves the apparent harm.** FedMut's worst class looks like 0.25 at the end, but averages 0.11 over training. The same holds for the worst-10% clients (0.27 vs 0.15).
+- **No ranking flip here.** FedMut beats FedAvg under every scope. With only two methods that is a weak test. G1 needs all 8 methods and real demographic groups (Adult) to test for rank changes.
+- **Caveats:** classes and label-mix clients are only proxies for demographic groups; one seed; one setting.
+
+**d = 0.5 pair** (Colab, momentum 0.5, seed 0; last-10 mean): FedAvg 48.61 (paper 54.33); FedMut 51.23 (paper 56.90).
+- FedMut's gain is +2.6 points, exactly the paper's +2.6.
+- Both runs are about 5.7 points below the paper. That offset is the same as at d = 0.1, so it is shared by both methods.
+- Colab run folders are now imported with `uv run python -m fairfl.experiments.import_runs` (reads `code/runs/colab/`).

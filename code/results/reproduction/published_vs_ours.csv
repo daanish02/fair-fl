@@ -48,10 +48,10 @@ LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_lg,local_dp_max,0.0362
 LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_lg,global_dp,0.0297,Table 1 p.6,0.0027,-0.0270,GAP
 FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavg_dp,accuracy_pct,93.40,Table 3 p.15 (DP FedAvg),,,NOT RUN
 FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,Table 3 p.15 (Table 5 says 94.13),,,NOT RUN
-FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedavg,accuracy_last10_pct,47.93,Table 1 p.12534,,,NOT RUN
-FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedmut,accuracy_last10_pct,51.25,Table 1 p.12534,,,NOT RUN
-FedMut,CIFAR-10 cnn_cifar d0.5 100 clients,fedmut_cifar10_cnn_cifar_d0.5_fedavg,accuracy_last10_pct,54.33,Table 1 p.12534,,,NOT RUN
-FedMut,CIFAR-10 cnn_cifar d0.5 100 clients,fedmut_cifar10_cnn_cifar_d0.5_fedmut,accuracy_last10_pct,56.9,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedavg,accuracy_last10_pct,47.93,Table 1 p.12534,40.5290,-7.4010,GAP
+FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedmut,accuracy_last10_pct,51.25,Table 1 p.12534,46.3290,-4.9210,GAP
+FedMut,CIFAR-10 cnn_cifar d0.5 100 clients,fedmut_cifar10_cnn_cifar_d0.5_fedavg,accuracy_last10_pct,54.33,Table 1 p.12534,48.6100,-5.7200,GAP
+FedMut,CIFAR-10 cnn_cifar d0.5 100 clients,fedmut_cifar10_cnn_cifar_d0.5_fedmut,accuracy_last10_pct,56.9,Table 1 p.12534,51.2340,-5.6660,GAP
 FedMut,CIFAR-10 cnn_cifar d1.0 100 clients,fedmut_cifar10_cnn_cifar_d1.0_fedavg,accuracy_last10_pct,57.0,Table 1 p.12534,,,NOT RUN
 FedMut,CIFAR-10 cnn_cifar d1.0 100 clients,fedmut_cifar10_cnn_cifar_d1.0_fedmut,accuracy_last10_pct,58.9,Table 1 p.12534,,,NOT RUN
 FedMut,CIFAR-10 cnn_cifar iid 100 clients,fedmut_cifar10_cnn_cifar_iid_fedavg,accuracy_last10_pct,57.32,Table 1 p.12534,,,NOT RUN
