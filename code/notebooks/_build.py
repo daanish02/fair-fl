@@ -86,6 +86,9 @@ else:
 # torch/torchvision/numpy/pandas/sklearn are preinstalled on both platforms; don't reinstall them.
 sh(f"pip install -q --no-deps --ignore-requires-python -e {REPO / 'code'}")  # Kaggle may run Python 3.11
 sh("pip install -q 'pydantic>=2.7' pyyaml typer")
+# An editable install is only picked up by a fresh interpreter; make the package importable in this kernel now.
+if str(REPO / "code" / "src") not in sys.path:
+    sys.path.insert(0, str(REPO / "code" / "src"))
 """)
 
 code("""
