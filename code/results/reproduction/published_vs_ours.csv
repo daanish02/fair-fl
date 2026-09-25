@@ -6,10 +6,10 @@ FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,best10_pct,100.00,Table 2
 FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,accuracy_pct,96.09,Table 2 p.398 (q=0.2),97.8700,+1.7800,OK
 FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,variance_pct2,12.58,Table 2 p.398 (q=0.2),5.5831,-6.9969,GAP
 FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,worst10_pct,88.40,Table 2 p.398 (q=0.2),92.3333,+3.9333,GAP
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,accuracy_pct,96.06,Table 2 p.398 (alpha=0.3 r=0.4),,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,variance_pct2,11.03,Table 2 p.398,,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,worst10_pct,89.17,Table 2 p.398,,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,best10_pct,100.00,Table 2 p.398,,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,accuracy_pct,96.06,Table 2 p.398 (alpha=0.3 r=0.4),98.8500,+2.7900,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,variance_pct2,11.03,Table 2 p.398,2.1586,-8.8714,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,worst10_pct,89.17,Table 2 p.398,95.8333,+6.6633,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,best10_pct,100.00,Table 2 p.398,100.0000,+0.0000,OK
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_fedavg,accuracy,0.8381,Table 1 p.6,0.8415,+0.0034,OK
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_fedavg,local_dp_max,0.1922,Table 1 p.6,0.1853,-0.0069,OK
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_fedavg,global_dp,0.1759,Table 1 p.6,0.1662,-0.0097,OK
@@ -22,6 +22,30 @@ LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_l,global_dp,0.0468,Tab
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,accuracy,0.8214,Table 1 p.6,0.8237,+0.0023,OK
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,local_dp_max,0.0489,Table 1 p.6,0.0291,-0.0198,GAP
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,global_dp,0.0204,Table 1 p.6,0.0064,-0.0140,GAP
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_fedavg,accuracy,0.8418,Table 1 p.6,0.8383,-0.0035,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_fedavg,local_dp_max,0.182,Table 1 p.6,0.1815,-0.0005,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_fedavg,global_dp,0.1725,Table 1 p.6,0.1685,-0.0040,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_g,accuracy,0.8264,Table 1 p.6,0.8280,+0.0016,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_g,local_dp_max,0.0399,Table 1 p.6,0.0261,-0.0138,GAP
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_g,global_dp,0.0104,Table 1 p.6,0.0223,+0.0119,GAP
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_l,accuracy,0.8237,Table 1 p.6,0.8243,+0.0006,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_l,local_dp_max,0.0252,Table 1 p.6,0.0406,+0.0154,GAP
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_l,global_dp,0.0215,Table 1 p.6,0.0131,-0.0084,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_lg,accuracy,0.8244,Table 1 p.6,0.8239,-0.0005,OK
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_lg,local_dp_max,0.0259,Table 1 p.6,0.0361,+0.0102,GAP
+LoGoFair,Adult alpha=5 5 clients DP,logofair_adult_a5_lg,global_dp,0.0138,Table 1 p.6,0.0075,-0.0063,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_fedavg,accuracy,0.8466,Table 1 p.6,0.8386,-0.0080,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_fedavg,local_dp_max,0.1802,Table 1 p.6,0.1893,+0.0091,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_fedavg,global_dp,0.1759,Table 1 p.6,0.1807,+0.0048,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_g,accuracy,0.8297,Table 1 p.6,0.8278,-0.0019,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_g,local_dp_max,0.0368,Table 1 p.6,0.0508,+0.0140,GAP
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_g,global_dp,0.0282,Table 1 p.6,0.0301,+0.0019,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_l,accuracy,0.8288,Table 1 p.6,0.8230,-0.0058,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_l,local_dp_max,0.0335,Table 1 p.6,0.0201,-0.0134,GAP
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_l,global_dp,0.0379,Table 1 p.6,0.0067,-0.0312,GAP
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_lg,accuracy,0.8283,Table 1 p.6,0.8223,-0.0060,OK
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_lg,local_dp_max,0.0362,Table 1 p.6,0.0167,-0.0195,GAP
+LoGoFair,Adult alpha=100 5 clients DP,logofair_adult_a100_lg,global_dp,0.0297,Table 1 p.6,0.0027,-0.0270,GAP
 FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavg_dp,accuracy_pct,93.40,Table 3 p.15 (DP FedAvg),,,NOT RUN
 FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,Table 3 p.15 (Table 5 says 94.13),,,NOT RUN
 FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedavg,accuracy_last10_pct,47.93,Table 1 p.12534,,,NOT RUN
@@ -66,3 +90,115 @@ FedCDA,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedavg,accuracy_last10_pc
 FedCDA,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedcda,accuracy_last10_pct,74.96,Table 1 p.8,,,NOT RUN
 FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavgdp,accuracy_pct,93.40,Table 3 p.15,,,NOT RUN
 FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,Table 3 p.15 (Table 5: 94.13),,,NOT RUN
+FairWeight,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,accuracy,0.77,Table II p.9,0.7153,-0.0547,GAP
+FairWeight,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,balanced_accuracy,0.79,Table II p.9,0.7935,+0.0035,OK
+FairWeight,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,dp,0.409,Table II p.9,0.3972,-0.0118,GAP
+FairWeight,adult R3C DP-constrained,fairweight_r3c_adult_fairweight,accuracy,0.71,Table II p.9,0.5831,-0.1269,GAP
+FairWeight,adult R3C DP-constrained,fairweight_r3c_adult_fairweight,balanced_accuracy,0.75,Table II p.9,0.7002,-0.0498,GAP
+FairWeight,adult R3C DP-constrained,fairweight_r3c_adult_fairweight,dp,0.01,Table II p.9,0.1070,+0.0970,GAP
+FairWeight,bank R3C DP-constrained,fairweight_r3c_bank_fedavg,accuracy,0.87,Table II p.9,0.8366,-0.0334,GAP
+FairWeight,bank R3C DP-constrained,fairweight_r3c_bank_fedavg,balanced_accuracy,0.79,Table II p.9,0.8301,+0.0401,GAP
+FairWeight,bank R3C DP-constrained,fairweight_r3c_bank_fedavg,dp,0.076,Table II p.9,0.1024,+0.0264,GAP
+FairWeight,bank R3C DP-constrained,fairweight_r3c_bank_fairweight,accuracy,0.85,Table II p.9,0.8274,-0.0226,GAP
+FairWeight,bank R3C DP-constrained,fairweight_r3c_bank_fairweight,balanced_accuracy,0.83,Table II p.9,0.8303,+0.0003,OK
+FairWeight,bank R3C DP-constrained,fairweight_r3c_bank_fairweight,dp,0.011,Table II p.9,0.0637,+0.0527,GAP
+FairWeight,default R3C DP-constrained,fairweight_r3c_default_fedavg,accuracy,0.78,Table II p.9,0.6070,-0.1730,GAP
+FairWeight,default R3C DP-constrained,fairweight_r3c_default_fedavg,balanced_accuracy,0.69,Table II p.9,0.6791,-0.0109,OK
+FairWeight,default R3C DP-constrained,fairweight_r3c_default_fedavg,dp,0.053,Table II p.9,0.0811,+0.0281,GAP
+FairWeight,default R3C DP-constrained,fairweight_r3c_default_fairweight,accuracy,0.75,Table II p.9,0.5620,-0.1880,GAP
+FairWeight,default R3C DP-constrained,fairweight_r3c_default_fairweight,balanced_accuracy,0.71,Table II p.9,0.6678,-0.0422,GAP
+FairWeight,default R3C DP-constrained,fairweight_r3c_default_fairweight,dp,0.015,Table II p.9,0.0300,+0.0150,GAP
+FairWeight,law R3C DP-constrained,fairweight_r3c_law_fedavg,accuracy,0.88,Table II p.9,0.8240,-0.0560,GAP
+FairWeight,law R3C DP-constrained,fairweight_r3c_law_fedavg,balanced_accuracy,0.72,Table II p.9,0.7768,+0.0568,GAP
+FairWeight,law R3C DP-constrained,fairweight_r3c_law_fedavg,dp,0.037,Table II p.9,0.0107,-0.0263,GAP
+FairWeight,law R3C DP-constrained,fairweight_r3c_law_fairweight,accuracy,0.83,Table II p.9,0.8280,-0.0020,OK
+FairWeight,law R3C DP-constrained,fairweight_r3c_law_fairweight,balanced_accuracy,0.78,Table II p.9,0.7744,-0.0056,OK
+FairWeight,law R3C DP-constrained,fairweight_r3c_law_fairweight,dp,0.005,Table II p.9,0.0130,+0.0080,OK
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_fedavg_s0,acc_normal_pct,61.14,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_fedavg_s0,std_pct,6.89,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fedavg_s10,acc_normal_pct,57.47,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fedavg_s10,acc_selfish_pct,34.6,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fedavg_s10,std_pct,15.85,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fedavg_s20,acc_normal_pct,42.85,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fedavg_s20,acc_selfish_pct,60.9,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fedavg_s20,std_pct,19.34,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fedavg_s30,acc_normal_pct,43.6,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fedavg_s30,acc_selfish_pct,49.97,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fedavg_s30,std_pct,18.99,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_qffl_s0,acc_normal_pct,60.44,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_qffl_s0,std_pct,6.7,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_qffl_s10,acc_normal_pct,51.49,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_qffl_s10,acc_selfish_pct,74.6,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_qffl_s10,std_pct,17.83,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_qffl_s20,acc_normal_pct,56.58,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_qffl_s20,acc_selfish_pct,63.4,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_qffl_s20,std_pct,9.55,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_qffl_s30,acc_normal_pct,59.23,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_qffl_s30,acc_selfish_pct,62.93,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_qffl_s30,std_pct,8.54,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_dqffl_s0,acc_normal_pct,60.36,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_dqffl_s0,std_pct,6.61,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_dqffl_s10,acc_normal_pct,53.93,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_dqffl_s10,acc_selfish_pct,73.4,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_dqffl_s10,std_pct,16.19,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_dqffl_s20,acc_normal_pct,55.92,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_dqffl_s20,acc_selfish_pct,63.8,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_dqffl_s20,std_pct,10.91,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_dqffl_s30,acc_normal_pct,54.37,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_dqffl_s30,acc_selfish_pct,57.73,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_dqffl_s30,std_pct,11.33,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_median_s0,acc_normal_pct,56.18,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_median_s0,std_pct,7.07,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_median_s10,acc_normal_pct,53.91,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_median_s10,acc_selfish_pct,52.4,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_median_s10,std_pct,6.91,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_median_s20,acc_normal_pct,52.0,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_median_s20,acc_selfish_pct,53.8,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_median_s20,std_pct,7.38,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_median_s30,acc_normal_pct,50.29,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_median_s30,acc_selfish_pct,52.13,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_median_s30,std_pct,6.96,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_fedcda_s0,acc_normal_pct,58.28,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_fedcda_s0,std_pct,10.1,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fedcda_s10,acc_normal_pct,41.69,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fedcda_s10,acc_selfish_pct,56.6,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fedcda_s10,std_pct,21.45,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fedcda_s20,acc_normal_pct,40.98,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fedcda_s20,acc_selfish_pct,51.4,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fedcda_s20,std_pct,18.49,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fedcda_s30,acc_normal_pct,37.49,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fedcda_s30,acc_selfish_pct,41.93,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fedcda_s30,std_pct,17.19,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_rflself_s0,acc_normal_pct,59.64,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_rflself_s0,std_pct,7.42,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_rflself_s10,acc_normal_pct,59.19,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_rflself_s10,acc_selfish_pct,54.4,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_rflself_s10,std_pct,7.24,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_rflself_s20,acc_normal_pct,59.12,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_rflself_s20,acc_selfish_pct,60.0,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_rflself_s20,std_pct,6.7,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_rflself_s30,acc_normal_pct,58.11,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_rflself_s30,acc_selfish_pct,59.67,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_rflself_s30,std_pct,6.86,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_qffl_rflself_s0,acc_normal_pct,59.22,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_qffl_rflself_s0,std_pct,7.05,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_qffl_rflself_s10,acc_normal_pct,59.71,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_qffl_rflself_s10,acc_selfish_pct,54.0,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_qffl_rflself_s10,std_pct,6.81,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_qffl_rflself_s20,acc_normal_pct,59.02,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_qffl_rflself_s20,acc_selfish_pct,59.5,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_qffl_rflself_s20,std_pct,6.68,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_qffl_rflself_s30,acc_normal_pct,57.97,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_qffl_rflself_s30,acc_selfish_pct,59.33,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_qffl_rflself_s30,std_pct,7.75,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_fairrfl_s0,acc_normal_pct,59.64,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 0% selfish,fairrfl_cifar10_fairrfl_s0,std_pct,6.73,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fairrfl_s10,acc_normal_pct,59.72,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fairrfl_s10,acc_selfish_pct,53.2,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 10% selfish,fairrfl_cifar10_fairrfl_s10,std_pct,6.67,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fairrfl_s20,acc_normal_pct,59.58,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fairrfl_s20,acc_selfish_pct,60.3,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 20% selfish,fairrfl_cifar10_fairrfl_s20,std_pct,6.62,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fairrfl_s30,acc_normal_pct,59.2,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fairrfl_s30,acc_selfish_pct,60.4,Table III p.329,,,NOT RUN
+FairRFL,CIFAR-10 50 clients phi=0.7 30% selfish,fairrfl_cifar10_fairrfl_s30,std_pct,6.52,Table III p.329,,,NOT RUN
