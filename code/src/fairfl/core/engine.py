@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from pathlib import Path
 from typing import Callable
@@ -51,6 +52,7 @@ class Simulator:
 
     def __init__(self, cfg: ExperimentConfig, data: FederatedData | None = None):
         self.cfg = cfg
+        self.diverged_at: int | None = None
         seed_everything(cfg.seed)
         self.data = data or build_federated(cfg.data, cfg.seed)
         self.device = resolve_device(cfg.device)
@@ -170,6 +172,12 @@ class Simulator:
             self.strategy.on_round_end(log)
             if on_round:
                 on_round(log)
+            if not math.isfinite(log.global_loss):
+                # NaN/inf never recovers: stop instead of burning the remaining rounds (summary records the round)
+                self.diverged_at = rnd + 1
+                print(f"[{self.cfg.name} s{self.cfg.seed}] diverged (loss {log.global_loss}) at round {rnd + 1}; "
+                      "stopping", flush=True)
+                break
             if ckpt is not None and every and (rnd + 1) % every == 0:
                 self._save_checkpoint(ckpt, rnd, gparams, velocity)
         t0 = time.perf_counter()

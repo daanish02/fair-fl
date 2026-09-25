@@ -118,6 +118,7 @@ def run_experiment(cfg: ExperimentConfig, out_dir: str | Path | None = None, ver
     logs = sim.run(on_round=show, checkpoint=ckpt)
     path = sim.save(out)
     summary = summarise_run(logs, cfg.fairness)
+    summary["diverged_at_round"] = sim.diverged_at
     (path / "summary.json").write_text(json.dumps(summary, indent=2, default=float), encoding="utf-8")
     record_result(cfg, summary, path)
     ckpt.unlink(missing_ok=True)

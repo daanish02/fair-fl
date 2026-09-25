@@ -1,16 +1,18 @@
 # FedMut (Hu et al., AAAI 2024) Table 1, CIFAR-10. Spec: docs/repro/fedmut.md.
-# Paper + official code (github.com/HMHelloWorld/FedMut): 100 clients, 10% per round, SGD lr 0.01 momentum 0.9,
+# Paper + official code (github.com/HMHelloWorld/FedMut): 100 clients, 10% per round, SGD lr 0.01 momentum 0.5,
 # batch 50, 5 local epochs, 1000 rounds; CIFAR-10 normalised with 0.5/0.5, no augmentation; the exact client
 # partitions shipped in the repo (assets/partitions/fedmut/); accuracy of the global model on the official test set,
 # reported as mean +- std of the last 10 evaluations (eval every 10 rounds).
 # FedMut: radius 4.0, mut_acc_rate 0.3 (CNN, VGG) / 0.5 (ResNet-18), mut_bound 50, uniform mean aggregation.
+# Momentum: the paper says 0.9, the code default (utils/options.py) is 0.5; code wins. With 0.9 every FedMut run
+# diverged to NaN within 30-50 rounds on Colab (2026-09-26), and FedAvg overfit (test loss rising).
 # Model: CNNCifar from the repo (LeNet-5 style, no normalisation layers) = kind cnn_cifar.
 name: fedmut_cifar10_cnn
 seed: 0
 data: {name: cifar10, source: train, global_test: official, num_clients: 100, test_fraction: 0.0, normalize: half,
        partition_file: assets/partitions/fedmut/cifar10_100_noniidCase5_beta0.1.json}
 model: {kind: cnn_cifar}
-train: {rounds: 1000, clients_per_round: 0.1, local_epochs: 5, batch_size: 50, lr: 0.01, momentum: 0.9, eval_every: 10}
+train: {rounds: 1000, clients_per_round: 0.1, local_epochs: 5, batch_size: 50, lr: 0.01, momentum: 0.5, eval_every: 10}
 strategy: {name: fedmut, params: {radius: 4.0, mut_acc_rate: 0.3, mut_bound: 50, weighted: false}}
 fairness:
   status: {benefit: accuracy, level: clients, accumulation: cumulative}

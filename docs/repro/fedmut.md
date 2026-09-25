@@ -11,7 +11,7 @@ Sources: `docs/impl-papers/FedMut - ...pdf` (page numbers below are the printed 
 | Participation | not stated ("K activated clients", Alg. 1) | `--frac 0.1` -> 10 per round | 10% |
 | Optimizer | SGD | `sgd` | SGD |
 | LR | 0.01 | 0.01 | 0.01, constant (no schedule in code) |
-| Momentum | 0.9 | **0.5** | 0.9 (paper); momentum buffer is re-created every round (new optimizer per local train) |
+| Momentum | 0.9 | **0.5** | **0.5 (code)**; momentum buffer is re-created every round (new optimizer per local train). Changed from 0.9 on 2026-09-26: with 0.9 every FedMut run went NaN (see lab notes) |
 | Weight decay | not stated | none (SGD default 0) | 0 |
 | Local batch size | 50 | 50 | 50 |
 | Local epochs | 5 | 5 | 5 |

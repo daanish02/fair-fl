@@ -22,3 +22,17 @@ def test_resume_matches_uninterrupted_run(tmp_path):
     logs = resumed.run(checkpoint=ckpt)
     torch.testing.assert_close(resumed.final_params, straight.final_params)
     assert [log.round for log in logs] == [log.round for log in straight.logs]
+
+
+def test_run_stops_when_loss_diverges():
+    sim = Simulator(cfg(6))
+    orig = sim.strategy.aggregate
+
+    def blow_up(rnd, gparams, results):  # NaN weights from round 2 on
+        out = orig(rnd, gparams, results)
+        return out * float("nan") if rnd >= 1 else out
+
+    sim.strategy.aggregate = blow_up
+    logs = sim.run()
+    assert sim.diverged_at == 2
+    assert len(logs) == 2
