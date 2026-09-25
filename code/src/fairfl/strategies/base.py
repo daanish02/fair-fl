@@ -24,6 +24,7 @@ class Strategy(ABC):
     Params: ClassVar[type[BaseModel]] = NoParams
     client_cls: ClassVar[type[ClientAlgorithm]] = SGDClient
     pre_eval_split: ClassVar[str] = "train"
+    needs_loss_before: ClassVar[bool] = False  # clients report the pre-training loss on their whole train split
 
     def __init__(self, params: BaseModel, train_cfg: TrainConfig, rng: np.random.Generator):
         self.p = params

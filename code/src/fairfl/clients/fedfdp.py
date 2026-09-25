@@ -48,7 +48,7 @@ class FedFDPClient(ClientAlgorithm):
         f_glob = c.get("global_loss")
         set_params(model, ins.params)
         tr = data.train
-        loss_before = mean_loss(model, tr)
+        loss_before = mean_loss(model, tr) if c.get("need_loss_before") else None
         names = [n for n, _ in model.named_parameters()]
         lr = self.lr(ins, state)
         dev = model_device(model)
@@ -62,17 +62,25 @@ class FedFDPClient(ClientAlgorithm):
         model.train()
         params = [p.detach().clone() for p in model.parameters()]
 
+        chunk = int(c.get("grad_chunk", 64))
+
         def dp_step(idx):
-            X, y = tr.X[idx].to(dev), tr.y[idx].to(dev)
-            grads = per_grad(tuple(params), X, y)
-            flat = torch.cat([g.reshape(len(idx), -1) for g in grads], dim=1)
-            norms = flat.norm(dim=1).clamp_min(1e-12)
-            if f_glob is None:
-                scale = torch.minimum(torch.ones_like(norms), C / norms)
-            else:
-                delta = per_loss(tuple(params), X, y).detach() - float(f_glob)
-                scale = torch.minimum(1.0 + lam * delta, C / norms)
-            noisy = (flat * scale[:, None]).sum(0) + sigma * C * torch.randn(flat.shape[1], generator=gen).to(dev)
+            # Per-sample gradients in chunks: memory O(chunk x params) instead of O(batch x params).
+            clipped = None
+            for j in range(0, len(idx), chunk):
+                part = idx[j : j + chunk]
+                X, y = tr.X[part].to(dev), tr.y[part].to(dev)
+                grads = per_grad(tuple(params), X, y)
+                flat = torch.cat([g.reshape(len(part), -1) for g in grads], dim=1)
+                norms = flat.norm(dim=1).clamp_min(1e-12)
+                if f_glob is None:
+                    scale = torch.minimum(torch.ones_like(norms), C / norms)
+                else:
+                    delta = per_loss(tuple(params), X, y).detach() - float(f_glob)
+                    scale = torch.minimum(1.0 + lam * delta, C / norms)
+                s = (flat * scale[:, None]).sum(0)
+                clipped = s if clipped is None else clipped + s
+            noisy = clipped + sigma * C * torch.randn(clipped.shape[0], generator=gen).to(dev)
             step = noisy / len(idx)
             off = 0
             for p in params:

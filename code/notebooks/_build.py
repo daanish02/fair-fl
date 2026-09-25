@@ -37,11 +37,13 @@ DRIVE_DIR = "fairfl"      # folder inside MyDrive
 # after a disconnect just run all cells again. Rough T4 times per run, in the order below:
 #   fedmut_cifar10_cnn       8 runs  ~ 30-40 min each (LeNet CNN, 1000 rounds)
 #   fedcda_fmnist           12 runs  ~ 10-15 min each (small CNN, 200 rounds x 20 local epochs)
+#   fedfdp_mnist             2 runs  ~ 30-60 min each (per-sample DP gradients)
 #   fedmut_cifar10_resnet18  8 runs  ~ 2.5-3 h each   -> needs several sessions; ONLY lists d0.1 and IID first
 #   fedcda_cifar10          12 runs  ~ 4 h each       -> ResNet-18, 20 local epochs; run a subset (ONLY)
 SUITES = [
     "suites/fedmut_cifar10_cnn.yaml",
     "suites/fedcda_fmnist.yaml",
+    "suites/fedfdp_mnist.yaml",        # 2 runs, 776 DP rounds; ~70 s/round on a laptop CPU, run it here
 ]
 # Optional: restrict to runs whose name contains one of these strings (e.g. ["d0.1", "iid"]); empty = all.
 ONLY = []

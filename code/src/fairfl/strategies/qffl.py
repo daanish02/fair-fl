@@ -27,6 +27,7 @@ class QFFL(Strategy):
     """Li, Sanjabi, Beirami, Smith, ICLR 2020 (q-FedAvg)."""
 
     Params = QFFLParams
+    needs_loss_before = True
 
     def aggregate(self, rnd, gparams, results):
         return qffl_step(gparams, results, [self.p.q] * len(results), self.train_cfg.lr)

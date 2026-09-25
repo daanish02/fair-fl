@@ -22,6 +22,7 @@ class FedFDPParams(FedFairParams):
     sampling: Literal["poisson", "batches"] = Field("poisson", description="poisson = paper (one batch per round).")
     q: float = Field(0.05, gt=0.0, le=1.0, description="Poisson sampling rate (paper default 0.05).")
     dp_steps: int = Field(1, ge=1, description="DP-SGD steps per round on the sampled batch (paper: 1).")
+    grad_chunk: int = Field(64, ge=1, description="Per-sample gradients computed this many at a time (memory only).")
 
 
 @register_strategy("fedfair")

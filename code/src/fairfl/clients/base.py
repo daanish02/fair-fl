@@ -92,7 +92,8 @@ class ClientAlgorithm(ABC):
     def fit(self, model: nn.Module, data: ClientData, ins: FitIns, state: dict[str, Any], gen: torch.Generator) -> FitRes:
         set_params(model, ins.params)
         train = data.train
-        loss_before = mean_loss(model, train)
+        # A full pass over the local train split; only q-FFL-style strategies need it.
+        loss_before = mean_loss(model, train) if ins.config.get("need_loss_before") else None
         opt = torch.optim.SGD(model.parameters(), lr=self.lr(ins, state), momentum=self.cfg.momentum,
                               weight_decay=self.cfg.weight_decay)
         dev = model_device(model)

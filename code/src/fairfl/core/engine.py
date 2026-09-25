@@ -141,6 +141,9 @@ class Simulator:
             pre = {cid: evaluate(self.model, getattr(self.data.clients[cid], self.strategy.pre_eval_split), cid)
                    for cid in self.strategy.configure_eval(rnd, ids)}
             ins_map = self.strategy.configure_round(rnd, gparams, ids, pre)
+            if self.strategy.needs_loss_before:
+                for ins in ins_map.values():
+                    ins.config["need_loss_before"] = True
             results = []
             for cid, ins in ins_map.items():
                 # CPU generator: batch permutations and noise are drawn on the CPU, so a seed gives the same

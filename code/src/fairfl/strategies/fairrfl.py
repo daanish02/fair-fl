@@ -58,6 +58,7 @@ class FairRFL(Strategy):
     """
 
     Params = FairRFLParams
+    needs_loss_before = True
 
     def initialize(self, gparams, num_clients, client_sizes, layer_sizes):
         super().initialize(gparams, num_clients, client_sizes, layer_sizes)
