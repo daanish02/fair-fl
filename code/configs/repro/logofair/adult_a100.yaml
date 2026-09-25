@@ -1,0 +1,18 @@
+# LoGoFair (Zhang et al., AAAI 2025) Table 1, Adult, alpha = 100, DP. Spec: docs/repro/logofair.md.
+# The repo ships only the alpha = 0.5 split, so this split (5 clients, Dir(2*alpha) on sex, 106 features, sex removed)
+# and its pre-trained logistic model were regenerated with the official pipeline (python -m fairfl.data.logofair_data),
+# which reproduces the shipped alpha = 0.5 split row for row and its pre-trained model to within 0.0004 accuracy.
+# Per-client 70/30 split with np.random.seed(1 + 111) as in main.py; validation = whole train split (code).
+# Post-processing = official code port (logofair_official): beta 1000, post_lr 0.005, 30 rounds, 20+20 steps,
+# beta calibration; delta_l = delta_g = 0.01 as stated for Table 1 (code default 0.02).
+# Metrics: accuracy, max local DP over clients, global DP on the union of test sets.
+name: logofair_adult_a100
+seed: 0
+data: {name: split_file, split_file: data/logofair/adult_alpha100_split.json, split_seed: 112, test_fraction: 0.3,
+       val_from_train: true}
+model: {kind: logistic, init_from: data/logofair/adult_alpha100_pre_model.pth}
+train: {rounds: 0}
+strategy: {name: logofair_official, params: {mode: lg, delta_g: 0.01, delta_l: 0.01}}
+fairness:
+  status: {benefit: dp, level: global, accumulation: cumulative}
+  scope: {kind: anytime}
