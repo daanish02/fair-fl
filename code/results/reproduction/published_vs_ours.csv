@@ -1,11 +1,11 @@
 paper,setting,run_name,metric,published,source,ours,diff,status
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,accuracy_pct,95.96,Table 2 p.398,,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,variance_pct2,15.06,Table 2 p.398,,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,worst10_pct,87.47,Table 2 p.398,,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,best10_pct,100.00,Table 2 p.398,,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,accuracy_pct,96.09,Table 2 p.398 (q=0.2),,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,variance_pct2,12.58,Table 2 p.398 (q=0.2),,,NOT RUN
-FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,worst10_pct,88.40,Table 2 p.398 (q=0.2),,,NOT RUN
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,accuracy_pct,95.96,Table 2 p.398,98.4900,+2.5300,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,variance_pct2,15.06,Table 2 p.398,4.1667,-10.8933,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,worst10_pct,87.47,Table 2 p.398,93.6667,+6.1967,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fedavg,best10_pct,100.00,Table 2 p.398,100.0000,+0.0000,OK
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,accuracy_pct,96.09,Table 2 p.398 (q=0.2),97.8700,+1.7800,OK
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,variance_pct2,12.58,Table 2 p.398 (q=0.2),5.5831,-6.9969,GAP
+FCFL,MNIST shards 100 clients,fcfl_mnist_shards_qffl,worst10_pct,88.40,Table 2 p.398 (q=0.2),92.3333,+3.9333,GAP
 FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,accuracy_pct,96.06,Table 2 p.398 (alpha=0.3 r=0.4),,,NOT RUN
 FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,variance_pct2,11.03,Table 2 p.398,,,NOT RUN
 FCFL,MNIST shards 100 clients,fcfl_mnist_shards_fcfl,worst10_pct,89.17,Table 2 p.398,,,NOT RUN
@@ -22,3 +22,47 @@ LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_l,global_dp,0.0468,Tab
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,accuracy,0.8214,Table 1 p.6,0.8237,+0.0023,OK
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,local_dp_max,0.0489,Table 1 p.6,0.0291,-0.0198,GAP
 LoGoFair,Adult alpha=0.5 5 clients DP,logofair_adult_a0.5_lg,global_dp,0.0204,Table 1 p.6,0.0064,-0.0140,GAP
+FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavg_dp,accuracy_pct,93.40,Table 3 p.15 (DP FedAvg),,,NOT RUN
+FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,Table 3 p.15 (Table 5 says 94.13),,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedavg,accuracy_last10_pct,47.93,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d0.1 100 clients,fedmut_cifar10_cnn_cifar_d0.1_fedmut,accuracy_last10_pct,51.25,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d0.5 100 clients,fedmut_cifar10_cnn_cifar_d0.5_fedavg,accuracy_last10_pct,54.33,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d0.5 100 clients,fedmut_cifar10_cnn_cifar_d0.5_fedmut,accuracy_last10_pct,56.9,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d1.0 100 clients,fedmut_cifar10_cnn_cifar_d1.0_fedavg,accuracy_last10_pct,57.0,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar d1.0 100 clients,fedmut_cifar10_cnn_cifar_d1.0_fedmut,accuracy_last10_pct,58.9,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar iid 100 clients,fedmut_cifar10_cnn_cifar_iid_fedavg,accuracy_last10_pct,57.32,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 cnn_cifar iid 100 clients,fedmut_cifar10_cnn_cifar_iid_fedmut,accuracy_last10_pct,59.7,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 d0.1 100 clients,fedmut_cifar10_resnet18_d0.1_fedavg,accuracy_last10_pct,44.41,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 d0.1 100 clients,fedmut_cifar10_resnet18_d0.1_fedmut,accuracy_last10_pct,55.43,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 d0.5 100 clients,fedmut_cifar10_resnet18_d0.5_fedavg,accuracy_last10_pct,61.75,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 d0.5 100 clients,fedmut_cifar10_resnet18_d0.5_fedmut,accuracy_last10_pct,67.89,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 d1.0 100 clients,fedmut_cifar10_resnet18_d1.0_fedavg,accuracy_last10_pct,65.88,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 d1.0 100 clients,fedmut_cifar10_resnet18_d1.0_fedmut,accuracy_last10_pct,70.01,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 iid 100 clients,fedmut_cifar10_resnet18_iid_fedavg,accuracy_last10_pct,64.08,Table 1 p.12534,,,NOT RUN
+FedMut,CIFAR-10 resnet18 iid 100 clients,fedmut_cifar10_resnet18_iid_fedmut,accuracy_last10_pct,70.63,Table 1 p.12534,,,NOT RUN
+FedCDA,fmnist shards2 20 clients,fedcda_fmnist_shards2_fedavg,accuracy_last10_pct,64.69,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist shards2 20 clients,fedcda_fmnist_shards2_fedcda,accuracy_last10_pct,66.3,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist shards4 20 clients,fedcda_fmnist_shards4_fedavg,accuracy_last10_pct,74.78,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist shards4 20 clients,fedcda_fmnist_shards4_fedcda,accuracy_last10_pct,76.59,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist shards8 20 clients,fedcda_fmnist_shards8_fedavg,accuracy_last10_pct,76.81,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist shards8 20 clients,fedcda_fmnist_shards8_fedcda,accuracy_last10_pct,78.99,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist dir0.1 20 clients,fedcda_fmnist_dir0.1_fedavg,accuracy_last10_pct,71.81,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist dir0.1 20 clients,fedcda_fmnist_dir0.1_fedcda,accuracy_last10_pct,78.63,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist dir0.3 20 clients,fedcda_fmnist_dir0.3_fedavg,accuracy_last10_pct,75.97,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist dir0.3 20 clients,fedcda_fmnist_dir0.3_fedcda,accuracy_last10_pct,84.67,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist dir0.5 20 clients,fedcda_fmnist_dir0.5_fedavg,accuracy_last10_pct,79.73,Table 1 p.8,,,NOT RUN
+FedCDA,fmnist dir0.5 20 clients,fedcda_fmnist_dir0.5_fedcda,accuracy_last10_pct,87.01,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 shards2 20 clients,fedcda_cifar10_shards2_fedavg,accuracy_last10_pct,28.1,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 shards2 20 clients,fedcda_cifar10_shards2_fedcda,accuracy_last10_pct,34.97,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 shards4 20 clients,fedcda_cifar10_shards4_fedavg,accuracy_last10_pct,59.83,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 shards4 20 clients,fedcda_cifar10_shards4_fedcda,accuracy_last10_pct,62.81,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 shards8 20 clients,fedcda_cifar10_shards8_fedavg,accuracy_last10_pct,70.87,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 shards8 20 clients,fedcda_cifar10_shards8_fedcda,accuracy_last10_pct,72.04,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 dir0.1 20 clients,fedcda_cifar10_dir0.1_fedavg,accuracy_last10_pct,50.43,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 dir0.1 20 clients,fedcda_cifar10_dir0.1_fedcda,accuracy_last10_pct,62.46,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 dir0.3 20 clients,fedcda_cifar10_dir0.3_fedavg,accuracy_last10_pct,61.11,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 dir0.3 20 clients,fedcda_cifar10_dir0.3_fedcda,accuracy_last10_pct,70.27,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedavg,accuracy_last10_pct,67.37,Table 1 p.8,,,NOT RUN
+FedCDA,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedcda,accuracy_last10_pct,74.96,Table 1 p.8,,,NOT RUN
+FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavgdp,accuracy_pct,93.40,Table 3 p.15,,,NOT RUN
+FedFDP,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,Table 3 p.15 (Table 5: 94.13),,,NOT RUN

@@ -98,14 +98,43 @@ class Simulator:
         self.logs.append(log)
         return log
 
-    def run(self, on_round: Callable[[RoundLog], None] | None = None) -> list[RoundLog]:
+    def _save_checkpoint(self, path: Path, rnd: int, gparams, velocity) -> None:
+        state = {"round": rnd, "gparams": gparams, "velocity": velocity, "strategy": self.strategy,
+                 "states": self.states, "logs": self.logs, "rng": self.rng, "scenarios": self.scenarios,
+                 "torch_rng": torch.get_rng_state(),
+                 "cuda_rng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None}
+        tmp = path.with_suffix(".tmp")
+        torch.save(state, tmp)
+        tmp.replace(path)  # atomic: a crash mid-write never leaves a broken checkpoint
+
+    def _load_checkpoint(self, path: Path):
+        state = torch.load(path, map_location=self.device, weights_only=False)
+        self.strategy, self.states, self.logs = state["strategy"], state["states"], state["logs"]
+        self.rng, self.scenarios = state["rng"], state["scenarios"]
+        self.client_algo = self.strategy.make_client()
+        torch.set_rng_state(state["torch_rng"])
+        if state["cuda_rng"] is not None and torch.cuda.is_available():
+            torch.cuda.set_rng_state_all(state["cuda_rng"])
+        return state["round"] + 1, state["gparams"], state["velocity"]
+
+    def run(self, on_round: Callable[[RoundLog], None] | None = None,
+            checkpoint: str | Path | None = None) -> list[RoundLog]:
+        """Run all rounds. With `checkpoint`, state is saved every `train.checkpoint_every` rounds and a later
+        call with the same path resumes after the last saved round."""
         ids = [c.client_id for c in self.data.clients]
-        gparams = get_params(self.model)
-        self.strategy.initialize(gparams, len(ids), [len(c.train) for c in self.data.clients],
-                                 [p.numel() for p in self.model.parameters()])
-        velocity = None
+        ckpt = Path(checkpoint) if checkpoint else None
+        start = 0
+        if ckpt is not None and ckpt.exists():
+            start, gparams, velocity = self._load_checkpoint(ckpt)
+            print(f"[{self.cfg.name} s{self.cfg.seed}] resumed from checkpoint at round {start}", flush=True)
+        else:
+            gparams = get_params(self.model)
+            self.strategy.initialize(gparams, len(ids), [len(c.train) for c in self.data.clients],
+                                     [p.numel() for p in self.model.parameters()])
+            velocity = None
         t0 = time.perf_counter()
-        for rnd in range(self.cfg.train.rounds):
+        every = self.cfg.train.checkpoint_every
+        for rnd in range(start, self.cfg.train.rounds):
             for sc in self.scenarios:
                 sc.before_round(rnd, self.data)
             set_params(self.model, gparams)
@@ -129,6 +158,8 @@ class Simulator:
             gparams = new
             set_params(self.model, gparams)
             if not self._eval_round(rnd):
+                if ckpt is not None and every and (rnd + 1) % every == 0:
+                    self._save_checkpoint(ckpt, rnd, gparams, velocity)
                 continue
             train_loss = float(np.mean([r.metrics.get("train_loss", np.nan) for r in results]))
             log = self._log(rnd, sorted(ins_map), train_loss, t0)
@@ -136,6 +167,8 @@ class Simulator:
             self.strategy.on_round_end(log)
             if on_round:
                 on_round(log)
+            if ckpt is not None and every and (rnd + 1) % every == 0:
+                self._save_checkpoint(ckpt, rnd, gparams, velocity)
         t0 = time.perf_counter()
         if self.cfg.train.rounds == 0:
             self._log(0, [], None, t0)  # the loaded model before any post-processing

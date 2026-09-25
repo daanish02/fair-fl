@@ -100,11 +100,15 @@ def run_experiment(cfg: ExperimentConfig, out_dir: str | Path | None = None, ver
             print(f"[{cfg.name} s{cfg.seed}] round {log.round:3d} acc={log.global_accuracy:.4f} "
                   f"loss={log.global_loss:.4f} ({log.seconds:.1f}s)", flush=True)
 
-    logs = sim.run(on_round=show)
-    path = sim.save(out_dir)
+    out = Path(out_dir or Path(cfg.output_dir) / cfg.name / f"seed{cfg.seed}")
+    out.mkdir(parents=True, exist_ok=True)
+    ckpt = out / "checkpoint.pt"
+    logs = sim.run(on_round=show, checkpoint=ckpt)
+    path = sim.save(out)
     summary = summarise_run(logs, cfg.fairness)
     (path / "summary.json").write_text(json.dumps(summary, indent=2, default=float), encoding="utf-8")
     record_result(cfg, summary, path)
+    ckpt.unlink(missing_ok=True)
     return path
 
 

@@ -59,6 +59,8 @@ class TrainConfig(BaseModel):
     weight_decay: float = Field(0.0, ge=0.0, description="Client SGD weight decay.")
     server_momentum: float = Field(0.0, ge=0.0, lt=1.0, description="FedAvgM momentum on the global update, "
                                                                      "applied after strategy.aggregate.")
+    checkpoint_every: int = Field(25, ge=0, description="Save a resumable checkpoint every k rounds "
+                                                         "(0 = off). A rerun resumes from it.")
     eval_every: int = Field(1, ge=1, description="Evaluate and log every k-th round (plus the final and "
                                                  "post-processed models). k > 1 coarsens the fairness scopes.")
 

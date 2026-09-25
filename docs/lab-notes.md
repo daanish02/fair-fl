@@ -130,3 +130,40 @@ The paper reports no seeds or standard deviations. This counts as "claim reprodu
   - 20 local epochs, 50 FedAvg warmup rounds, K = 3, B = 3 near-equal batches of the 4 participants, L = 1;
   - one run each (the paper averages 2).
 - **Where they run:** the GPU suites run on Colab (`code/notebooks/fairfl_gpu.ipynb`). Run results go to Drive and are merged into `code/results/runs.jsonl`.
+
+---
+
+## 2026-09-25 — FCFL Table 2 (MNIST): our baselines are stronger and fairer than the published ones
+
+**For:** the reproduction table, plus a caveat on baselines taken from papers.
+
+**Setup:** paper Table 2 plus official code. 100 clients, 2 label shards each, 10% per round, CNNMnist, lr 0.1, client momentum 0.5, 1 epoch, batch 64, 2000 rounds. Unshuffled 80/10/10 client slices as in the code. Accuracy is on the official test set; variance and best/worst 10% are over the 100 local test slices. Seed 0, single run (the paper averages 5). Config: `code/configs/repro/fcfl/mnist_shards.yaml`.
+
+| Method | Acc % (paper / ours) | Variance %^2 (paper / ours) | Worst 10% (paper / ours) | Best 10% (paper / ours) |
+|---|---|---|---|---|
+| FedAvg | 95.96 / 98.49 | 15.06 / 4.17 | 87.47 / 93.67 | 100 / 100 |
+| q-FedAvg (q = 0.2) | 96.09 / 97.87 | 12.58 / 5.58 | 88.40 / 92.33 | 100 / — |
+| FCFL (alpha 0.3, r 0.4) | 96.06 / pending | 11.03 / pending | 89.17 / pending | 100 / pending |
+
+**Reading:**
+- Our FedAvg is about 2.5 points more accurate and about 3.6x fairer (variance) than the FedAvg the paper reports.
+- The paper's baselines are not released ("we directly rewrite the code for comparison", p.397). Its FedAvg therefore used an unknown local setup, while ours uses FCFL's own client pipeline. The published baseline gap may partly be a baseline-implementation gap.
+- q-FedAvg at q = 0.2 does not reduce variance in our run (5.58 vs 4.17), contrary to the paper's ordering. The paper picked q per method by grid search ("best performance"); we ran only the reported best q.
+- **What decides this reproduction** is whether FCFL beats our FedAvg on variance and worst-10%, not the absolute numbers.
+
+**Tooling fix:** `fairfl compare` had marked these as OK. The absolute slack was multiplied by the %^2 scale, and a 5% relative tolerance let 2.5-point accuracy gaps pass. It now uses 2% relative tolerance, plus absolute slack only for rates (0.01, or 1 point in %).
+
+---
+
+## 2026-09-25 — Runs lost to a machine shutdown; added checkpoint/resume
+
+**For:** internal reproducibility (not paper content).
+
+- **Lost:** the laptop stopped mid-session, killing the local FCFL run (at round 1650/2000) and FedFDP (just started), and the Colab session.
+- **Survived** in `code/results/runs.jsonl`: LoGoFair x4, FCFL-MNIST FedAvg and q-FedAvg.
+- **Checkpointing:** the engine now saves a checkpoint every `train.checkpoint_every` rounds (default 25) to `<run dir>/checkpoint.pt`.
+  - The checkpoint holds params, server momentum, the whole strategy object (queues, caches, RNG), client states, logs, and the torch/CUDA RNG.
+  - It is written atomically.
+  - Any rerun (`fairfl batch` locally, Run all on Colab) resumes after the last checkpoint, and the checkpoint is deleted when the run finishes.
+  - `tests/test_checkpoint.py` checks that an interrupted-and-resumed FCFL run ends with *identical* parameters to an uninterrupted one.
+- **Keep-awake:** `fairfl batch` also asks Windows not to idle-sleep while a suite runs. It cannot prevent manual sleep, closing the lid, or a shutdown.

@@ -19,7 +19,7 @@ def latest_runs(path: Path = RESULTS_DIR / "runs.jsonl") -> dict[str, dict]:
     return runs
 
 
-def compare(rel_tol: float = 0.05, abs_tol: float = 0.01) -> list[dict]:
+def compare(rel_tol: float = 0.02, abs_tol: float = 0.01) -> list[dict]:
     runs = latest_runs()
     out = []
     with open(RESULTS_DIR / "reproduction" / "published.csv", encoding="utf-8") as f:
@@ -33,7 +33,10 @@ def compare(rel_tol: float = 0.05, abs_tol: float = 0.01) -> list[dict]:
                 status, diff = "NOT RUN", ""
             else:
                 diff = ours - pub
-                ok = abs(diff) <= max(abs_tol * float(p["scale"]), rel_tol * abs(pub))
+                scale = float(p["scale"])
+                # absolute slack for rates (0.01 on [0,1], 1 point on %); variances (%^2) use the relative slack only
+                slack = abs_tol * scale if scale <= 100 else 0.0
+                ok = abs(diff) <= max(slack, rel_tol * abs(pub))
                 status = "OK" if ok else "GAP"
                 diff = f"{diff:+.4f}"
             out.append({**{k: p[k] for k in ("paper", "setting", "run_name", "metric", "published", "source")},

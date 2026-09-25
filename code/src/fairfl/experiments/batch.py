@@ -43,7 +43,7 @@ def _job(args: tuple[str, int, dict, str, int]) -> tuple[str, str, float]:
     t0 = time.time()
     out_p = Path(out)
     out_p.mkdir(parents=True, exist_ok=True)
-    with open(out_p / "log.txt", "w", encoding="utf-8") as log:
+    with open(out_p / "log.txt", "a", encoding="utf-8") as log:  # append: a resumed run keeps its history
         sys.stdout = sys.stderr = log
         try:
             cfg = ExperimentConfig.from_yaml(config)
@@ -80,7 +80,21 @@ def run_suite(path: str, workers: int = 3, threads: int = 4, root: str = "runs")
     print(f"[{suite.name}] {len(jobs)} of {total} runs to do; {workers} workers x {threads} threads", flush=True)
     if not jobs:
         return
-    ctx = mp.get_context("spawn")
-    with ctx.Pool(workers, maxtasksperchild=1) as pool:
-        for out, status, secs in pool.imap_unordered(_job, [(*j, threads) for j in jobs]):
-            print(f"[{suite.name}] {status:5s} {secs / 60:6.1f} min  {out}", flush=True)
+    keep_awake(True)
+    try:
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(workers, maxtasksperchild=1) as pool:
+            for out, status, secs in pool.imap_unordered(_job, [(*j, threads) for j in jobs]):
+                print(f"[{suite.name}] {status:5s} {secs / 60:6.1f} min  {out}", flush=True)
+    finally:
+        keep_awake(False)
+
+
+def keep_awake(on: bool) -> None:
+    """Windows: stop the machine from idle-sleeping while a suite runs (it can still be put to sleep manually)."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+    ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | (ES_SYSTEM_REQUIRED if on else 0))
