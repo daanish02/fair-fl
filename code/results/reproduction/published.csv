@@ -89,7 +89,6 @@ FedCDA,ICLR 2024,cifar10 dir0.3 20 clients,fedcda_cifar10_dir0.3_fedcda,accuracy
 FedCDA,ICLR 2024,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedavg,accuracy_last10_pct,67.37,global_test_acc_last10_mean,100,Table 1 p.8
 FedCDA,ICLR 2024,cifar10 dir0.5 20 clients,fedcda_cifar10_dir0.5_fedcda,accuracy_last10_pct,74.96,global_test_acc_last10_mean,100,Table 1 p.8
 FedFDP,ACNS 2026,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedavgdp,accuracy_pct,93.40,final_global_test_accuracy,100,Table 3 p.15
-FedFDP,ACNS 2026,MNIST Dir0.1 10 clients eps3.52,fedfdp_mnist_fedfdp,accuracy_pct,95.13,final_global_test_accuracy,100,Table 3 p.15 (Table 5: 94.13)
 FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,accuracy,0.77,final_global_test_accuracy,1,Table II p.9
 FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,balanced_accuracy,0.79,final_global_test_ba,1,Table II p.9
 FairWeight,IEEE TSC 2026,adult R3C DP-constrained,fairweight_r3c_adult_fedavg,dp,0.409,final_global_test_dp,1,Table II p.9
