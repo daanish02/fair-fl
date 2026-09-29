@@ -18,7 +18,8 @@ def train(
     rounds: int = typer.Option(30),
     local_epochs: int = typer.Option(5),
     alpha: float = typer.Option(0.5, help="Dirichlet concentration"),
-    lr: float = typer.Option(0.01),
+    lr: float = typer.Option(0.1),
+    weight_decay: float = typer.Option(5e-4),
     batch_size: int = typer.Option(64),
     seed: int = typer.Option(0),
     data_root: str = typer.Option("data"),
@@ -35,7 +36,7 @@ def train(
     else:
         cfg = RunConfig(
             num_clients=num_clients, rounds=rounds, local_epochs=local_epochs, alpha=alpha,
-            lr=lr, batch_size=batch_size, seed=seed, data_root=data_root, device=device,
+            lr=lr, weight_decay=weight_decay, batch_size=batch_size, seed=seed, data_root=data_root, device=device,
         )
 
     mode = "centralised" if cfg.is_centralised else f"federated ({cfg.num_clients} clients)"

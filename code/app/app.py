@@ -31,7 +31,8 @@ with st.sidebar:
     rounds = st.number_input("rounds", min_value=1, max_value=500, value=30)
     local_epochs = st.number_input("local_epochs", min_value=1, max_value=50, value=5)
     alpha = st.number_input("alpha (Dirichlet)", min_value=0.01, max_value=100.0, value=0.5)
-    lr = st.number_input("lr", min_value=1e-5, max_value=1.0, value=0.01, format="%.4f")
+    lr = st.number_input("lr", min_value=1e-5, max_value=1.0, value=0.1, format="%.4f")
+    weight_decay = st.number_input("weight_decay", min_value=0.0, max_value=1e-2, value=5e-4, format="%.5f")
     batch_size = st.number_input("batch_size", min_value=1, max_value=1024, value=64)
     seed = st.number_input("seed", min_value=0, value=0)
     device = st.selectbox("device", ["auto", "cpu", "cuda"])
@@ -51,7 +52,7 @@ def _worker(cfg: RunConfig, stop_event: threading.Event, out_q: queue.Queue):
 if run_btn and not running:
     cfg = RunConfig(
         num_clients=num_clients, rounds=rounds, local_epochs=local_epochs, alpha=alpha,
-        lr=lr, batch_size=batch_size, seed=seed, device=device,
+        lr=lr, weight_decay=weight_decay, batch_size=batch_size, seed=seed, device=device,
     )
     st.session_state.cfg = cfg
     st.session_state.stop_event = threading.Event()

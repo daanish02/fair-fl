@@ -54,10 +54,9 @@ def _eval_acc(model: nn.Module, ds: TensorDataset, device: torch.device, batch_s
 
 
 def _train_epochs(
-    model: nn.Module, ds: TensorDataset, device: torch.device, epochs: int, lr: float, batch_size: int,
-    gen: torch.Generator, augment: bool = True, log_every: int = 0,
+    model: nn.Module, ds: TensorDataset, device: torch.device, epochs: int, opt: torch.optim.Optimizer,
+    batch_size: int, gen: torch.Generator, augment: bool = True, log_every: int = 0,
 ) -> float:
-    opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     loss_fn = nn.CrossEntropyLoss()
     model.train()
     n = len(ds)
@@ -93,18 +92,22 @@ def run_centralised(cfg: RunConfig, stop_event: threading.Event | None = None) -
     log.info("data loaded in %.1fs (train=%d test=%d)", time.perf_counter() - t_data, len(train_ds), len(test_ds))
 
     model = build_resnet18().to(device)
+    opt = torch.optim.SGD(model.parameters(), lr=cfg.lr, momentum=0.9, weight_decay=cfg.weight_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.rounds)
     history = []
     t_start = time.perf_counter()
     for r in range(1, cfg.rounds + 1):
         t0 = time.perf_counter()
-        loss = _train_epochs(model, train_ds, device, 1, cfg.lr, cfg.batch_size, gen, log_every=cfg.log_every)
+        loss = _train_epochs(model, train_ds, device, 1, opt, cfg.batch_size, gen, log_every=cfg.log_every)
+        scheduler.step()
         acc = _eval_acc(model, test_ds, device)
         elapsed = time.perf_counter() - t0
         avg = (time.perf_counter() - t_start) / r
         eta = avg * (cfg.rounds - r)
         rr = RoundResult(round=r, train_loss=loss, test_acc=acc, elapsed_s=elapsed, eta_s=eta)
         history.append(rr)
-        log.info("epoch %d/%d loss=%.4f acc=%.4f (%.1fs, ETA %.0fs)", r, cfg.rounds, loss, acc, elapsed, eta)
+        log.info("epoch %d/%d loss=%.4f acc=%.4f lr=%.5f (%.1fs, ETA %.0fs)",
+                  r, cfg.rounds, loss, acc, opt.param_groups[0]["lr"], elapsed, eta)
         yield rr
         if stop_event is not None and stop_event.is_set():
             log.info("stop requested, halting after epoch %d/%d", r, cfg.rounds)
@@ -138,8 +141,13 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
     history = []
     t_start = time.perf_counter()
 
+    # cosine-decay the lr by communication round (all clients in a round share the same lr)
+    dummy_opt = torch.optim.SGD([torch.zeros(1, requires_grad=True)], lr=cfg.lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(dummy_opt, T_max=cfg.rounds)
+
     for r in range(1, cfg.rounds + 1):
         t0 = time.perf_counter()
+        round_lr = dummy_opt.param_groups[0]["lr"]
         global_state = global_model.state_dict()
         stopped_mid_round = False
         state_dicts, weights, round_loss = [], [], 0.0
@@ -149,8 +157,10 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
                 stopped_mid_round = True
                 break
             local_model.load_state_dict(global_state)
+            local_opt = torch.optim.SGD(local_model.parameters(), lr=round_lr, momentum=0.9,
+                                         weight_decay=cfg.weight_decay)
             log_every = cfg.log_every if c == 0 else 0  # only client 0 logs per-batch, avoids spam
-            loss = _train_epochs(local_model, client_train[c], device, cfg.local_epochs, cfg.lr, cfg.batch_size,
+            loss = _train_epochs(local_model, client_train[c], device, cfg.local_epochs, local_opt, cfg.batch_size,
                                   gen, log_every=log_every)
             state_dicts.append({k: v.detach().clone() for k, v in local_model.state_dict().items()})
             weights.append(len(client_train[c]))
@@ -169,6 +179,7 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
             else:
                 avg_state[key] = state_dicts[0][key]
         global_model.load_state_dict(avg_state)
+        scheduler.step()
 
         acc = _eval_acc(global_model, test_ds, device)
         elapsed = time.perf_counter() - t0
@@ -176,7 +187,8 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
         eta = avg * (cfg.rounds - r)
         rr = RoundResult(round=r, train_loss=round_loss, test_acc=acc, elapsed_s=elapsed, eta_s=eta)
         history.append(rr)
-        log.info("round %d/%d loss=%.4f acc=%.4f (%.1fs, ETA %.0fs)", r, cfg.rounds, round_loss, acc, elapsed, eta)
+        log.info("round %d/%d loss=%.4f acc=%.4f lr=%.5f (%.1fs, ETA %.0fs)",
+                  r, cfg.rounds, round_loss, acc, round_lr, elapsed, eta)
         yield rr
         if stop_event is not None and stop_event.is_set():
             log.info("stop requested, halting after round %d/%d", r, cfg.rounds)
