@@ -1,0 +1,512 @@
+=== median ===
+[fairfl] federated (10 clients) | strategy=median model=cnn_cifar rounds=100 alpha=0.5 lr=0.1
+15:36:23 federated: device=cpu clients=10 alpha=0.5 strategy=median loading CIFAR10 from data
+15:36:25 data loaded + partitioned in 2.2s; client shard sizes=[5497, 4205, 10949, 3657, 2921, 3963, 2747, 4040, 1608, 10413]
+15:36:26   epoch 1 batch 50/86 loss=1.1912
+C:\Users\Danish\personal\study\11-bpdc-me-ss\3rd Sem\fairness-in-fl\code\src\fairfl\train\engine.py:201: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  scheduler.step()
+15:36:32 round 1/100 loss=1.6579 acc=0.1000 lr=0.10000 (6.0s, ETA 593s)
+15:36:32   epoch 1 batch 50/86 loss=1.5369
+15:36:37 round 2/100 loss=1.6980 acc=0.1000 lr=0.09998 (5.4s, ETA 557s)
+15:36:37   epoch 1 batch 50/86 loss=1.5706
+15:36:42 round 3/100 loss=1.6276 acc=0.0999 lr=0.09990 (5.4s, ETA 541s)
+15:36:43   epoch 1 batch 50/86 loss=1.4433
+15:36:48 round 4/100 loss=1.6075 acc=0.1610 lr=0.09978 (5.4s, ETA 531s)
+15:36:48   epoch 1 batch 50/86 loss=1.1903
+15:36:53 round 5/100 loss=1.5419 acc=0.1453 lr=0.09961 (5.3s, ETA 522s)
+15:36:53   epoch 1 batch 50/86 loss=1.8299
+15:36:58 round 6/100 loss=1.5223 acc=0.1669 lr=0.09938 (5.4s, ETA 514s)
+15:36:59   epoch 1 batch 50/86 loss=1.3272
+15:37:04 round 7/100 loss=1.5197 acc=0.1507 lr=0.09911 (5.3s, ETA 507s)
+15:37:04   epoch 1 batch 50/86 loss=1.5397
+15:37:09 round 8/100 loss=1.5194 acc=0.1832 lr=0.09880 (5.3s, ETA 500s)
+15:37:09   epoch 1 batch 50/86 loss=1.1885
+15:37:14 round 9/100 loss=1.5193 acc=0.1796 lr=0.09843 (5.3s, ETA 494s)
+15:37:15   epoch 1 batch 50/86 loss=1.3103
+15:37:20 round 10/100 loss=1.5109 acc=0.1726 lr=0.09801 (5.4s, ETA 488s)
+15:37:20   epoch 1 batch 50/86 loss=1.2563
+15:37:25 round 11/100 loss=1.5034 acc=0.2082 lr=0.09755 (5.4s, ETA 482s)
+15:37:25   epoch 1 batch 50/86 loss=1.5382
+15:37:30 round 12/100 loss=1.4835 acc=0.1928 lr=0.09704 (5.3s, ETA 476s)
+15:37:31   epoch 1 batch 50/86 loss=1.2170
+15:37:36 round 13/100 loss=1.4743 acc=0.2110 lr=0.09649 (5.4s, ETA 470s)
+15:37:36   epoch 1 batch 50/86 loss=1.0239
+15:37:41 round 14/100 loss=1.4667 acc=0.2143 lr=0.09589 (5.4s, ETA 465s)
+15:37:41   epoch 1 batch 50/86 loss=1.3090
+15:37:46 round 15/100 loss=1.4503 acc=0.2434 lr=0.09524 (5.3s, ETA 459s)
+15:37:47   epoch 1 batch 50/86 loss=1.1360
+15:37:52 round 16/100 loss=1.4313 acc=0.2639 lr=0.09455 (5.4s, ETA 453s)
+15:37:52   epoch 1 batch 50/86 loss=1.6351
+15:37:57 round 17/100 loss=1.4179 acc=0.2342 lr=0.09382 (5.4s, ETA 448s)
+15:37:58   epoch 1 batch 50/86 loss=1.5603
+15:38:03 round 18/100 loss=1.4078 acc=0.2582 lr=0.09304 (5.4s, ETA 442s)
+15:38:03   epoch 1 batch 50/86 loss=1.6273
+15:38:08 round 19/100 loss=1.4007 acc=0.2858 lr=0.09222 (5.4s, ETA 437s)
+15:38:08   epoch 1 batch 50/86 loss=0.9494
+15:38:13 round 20/100 loss=1.3844 acc=0.2961 lr=0.09135 (5.3s, ETA 431s)
+15:38:14   epoch 1 batch 50/86 loss=1.3450
+15:38:19 round 21/100 loss=1.3727 acc=0.2503 lr=0.09045 (5.4s, ETA 426s)
+15:38:19   epoch 1 batch 50/86 loss=1.1195
+15:38:24 round 22/100 loss=1.3742 acc=0.2788 lr=0.08951 (5.4s, ETA 421s)
+15:38:25   epoch 1 batch 50/86 loss=1.4199
+15:38:30 round 23/100 loss=1.3642 acc=0.2968 lr=0.08853 (5.4s, ETA 415s)
+15:38:30   epoch 1 batch 50/86 loss=1.2403
+15:38:35 round 24/100 loss=1.3551 acc=0.2987 lr=0.08751 (5.3s, ETA 410s)
+15:38:35   epoch 1 batch 50/86 loss=1.4748
+15:38:40 round 25/100 loss=1.3521 acc=0.2824 lr=0.08645 (5.4s, ETA 404s)
+15:38:41   epoch 1 batch 50/86 loss=1.5127
+15:38:46 round 26/100 loss=1.3474 acc=0.3095 lr=0.08536 (5.3s, ETA 398s)
+15:38:46   epoch 1 batch 50/86 loss=1.0339
+15:38:51 round 27/100 loss=1.3352 acc=0.2981 lr=0.08423 (5.3s, ETA 393s)
+15:38:51   epoch 1 batch 50/86 loss=1.2181
+15:38:56 round 28/100 loss=1.3450 acc=0.3193 lr=0.08307 (5.4s, ETA 388s)
+15:38:57   epoch 1 batch 50/86 loss=1.1164
+15:39:02 round 29/100 loss=1.3253 acc=0.3128 lr=0.08187 (5.4s, ETA 382s)
+15:39:02   epoch 1 batch 50/86 loss=1.4261
+15:39:07 round 30/100 loss=1.3109 acc=0.3225 lr=0.08065 (5.4s, ETA 377s)
+15:39:08   epoch 1 batch 50/86 loss=1.0657
+15:39:17 round 31/100 loss=1.3173 acc=0.3638 lr=0.07939 (9.7s, ETA 381s)
+15:39:17   epoch 1 batch 50/86 loss=1.1871
+15:39:28 round 32/100 loss=1.3094 acc=0.3342 lr=0.07810 (11.4s, ETA 388s)
+15:39:29   epoch 1 batch 50/86 loss=1.0433
+15:39:39 round 33/100 loss=1.3026 acc=0.3278 lr=0.07679 (11.0s, ETA 393s)
+15:39:40   epoch 1 batch 50/86 loss=1.0765
+15:39:52 round 34/100 loss=1.2904 acc=0.3388 lr=0.07545 (12.8s, ETA 401s)
+15:39:54   epoch 1 batch 50/86 loss=1.0971
+15:40:27 round 35/100 loss=1.2802 acc=0.3759 lr=0.07409 (34.7s, ETA 448s)
+15:40:27   epoch 1 batch 50/86 loss=1.0243
+15:40:50 round 36/100 loss=1.2816 acc=0.3588 lr=0.07270 (23.6s, ETA 471s)
+15:40:51   epoch 1 batch 50/86 loss=1.0092
+15:41:03 round 37/100 loss=1.2663 acc=0.3891 lr=0.07129 (12.7s, ETA 472s)
+15:41:04   epoch 1 batch 50/86 loss=1.1980
+15:41:14 round 38/100 loss=1.2631 acc=0.3946 lr=0.06986 (10.9s, ETA 470s)
+15:41:15   epoch 1 batch 50/86 loss=1.0716
+15:41:26 round 39/100 loss=1.2466 acc=0.3993 lr=0.06841 (12.2s, ETA 470s)
+15:41:27   epoch 1 batch 50/86 loss=1.1089
+15:41:37 round 40/100 loss=1.2547 acc=0.4131 lr=0.06694 (10.9s, ETA 467s)
+15:41:38   epoch 1 batch 50/86 loss=0.9399
+15:41:46 round 41/100 loss=1.2370 acc=0.4243 lr=0.06545 (9.4s, ETA 462s)
+15:41:47   epoch 1 batch 50/86 loss=1.0072
+15:41:57 round 42/100 loss=1.2299 acc=0.4247 lr=0.06395 (11.1s, ETA 458s)
+15:41:58   epoch 1 batch 50/86 loss=1.1106
+15:42:09 round 43/100 loss=1.2275 acc=0.4282 lr=0.06243 (11.8s, ETA 456s)
+15:42:10   epoch 1 batch 50/86 loss=1.3317
+15:42:20 round 44/100 loss=1.2081 acc=0.4277 lr=0.06091 (10.7s, ETA 451s)
+15:42:21   epoch 1 batch 50/86 loss=1.0135
+15:42:32 round 45/100 loss=1.2002 acc=0.4461 lr=0.05937 (12.1s, ETA 448s)
+15:42:33   epoch 1 batch 50/86 loss=1.0522
+15:42:44 round 46/100 loss=1.1889 acc=0.4529 lr=0.05782 (11.7s, ETA 444s)
+15:42:45   epoch 1 batch 50/86 loss=0.9126
+15:42:56 round 47/100 loss=1.1774 acc=0.4564 lr=0.05627 (12.2s, ETA 440s)
+15:42:57   epoch 1 batch 50/86 loss=0.9146
+15:43:09 round 48/100 loss=1.1719 acc=0.4569 lr=0.05471 (12.8s, ETA 437s)
+15:43:10   epoch 1 batch 50/86 loss=0.8905
+15:43:22 round 49/100 loss=1.1615 acc=0.4744 lr=0.05314 (12.9s, ETA 433s)
+15:43:23   epoch 1 batch 50/86 loss=1.1954
+15:43:34 round 50/100 loss=1.1582 acc=0.4590 lr=0.05157 (12.4s, ETA 429s)
+15:43:35   epoch 1 batch 50/86 loss=1.3411
+15:43:45 round 51/100 loss=1.1392 acc=0.4691 lr=0.05000 (11.1s, ETA 423s)
+15:43:46   epoch 1 batch 50/86 loss=0.8645
+15:43:56 round 52/100 loss=1.1343 acc=0.4835 lr=0.04843 (10.9s, ETA 416s)
+15:43:57   epoch 1 batch 50/86 loss=0.9885
+15:44:09 round 53/100 loss=1.1227 acc=0.4820 lr=0.04686 (13.0s, ETA 411s)
+15:44:10   epoch 1 batch 50/86 loss=0.8534
+15:44:24 round 54/100 loss=1.1169 acc=0.4990 lr=0.04529 (15.0s, ETA 408s)
+15:44:26   epoch 1 batch 50/86 loss=0.9737
+15:44:47 round 55/100 loss=1.1023 acc=0.4919 lr=0.04373 (23.1s, ETA 411s)
+15:44:50   epoch 1 batch 50/86 loss=1.1200
+15:45:20 round 56/100 loss=1.0945 acc=0.5033 lr=0.04218 (32.6s, ETA 420s)
+15:45:21   epoch 1 batch 50/86 loss=1.0569
+15:45:32 round 57/100 loss=1.0856 acc=0.5104 lr=0.04063 (12.6s, ETA 413s)
+15:45:34   epoch 1 batch 50/86 loss=0.8896
+15:45:44 round 58/100 loss=1.0656 acc=0.5152 lr=0.03909 (11.7s, ETA 405s)
+15:45:45   epoch 1 batch 50/86 loss=0.8093
+15:45:55 round 59/100 loss=1.0684 acc=0.5113 lr=0.03757 (10.7s, ETA 396s)
+15:45:56   epoch 1 batch 50/86 loss=1.0373
+15:46:08 round 60/100 loss=1.0582 acc=0.5172 lr=0.03605 (12.7s, ETA 388s)
+15:46:09   epoch 1 batch 50/86 loss=0.8269
+15:46:25 round 61/100 loss=1.0502 acc=0.5174 lr=0.03455 (17.0s, ETA 383s)
+15:46:26   epoch 1 batch 50/86 loss=1.0254
+15:46:40 round 62/100 loss=1.0446 acc=0.5280 lr=0.03306 (15.8s, ETA 377s)
+15:46:41   epoch 1 batch 50/86 loss=0.7041
+15:46:54 round 63/100 loss=1.0326 acc=0.5314 lr=0.03159 (13.9s, ETA 369s)
+15:46:55   epoch 1 batch 50/86 loss=1.0713
+15:47:11 round 64/100 loss=1.0168 acc=0.5363 lr=0.03014 (16.5s, ETA 363s)
+15:47:12   epoch 1 batch 50/86 loss=0.7328
+15:47:26 round 65/100 loss=1.0130 acc=0.5377 lr=0.02871 (15.5s, ETA 356s)
+15:47:27   epoch 1 batch 50/86 loss=0.7882
+15:47:43 round 66/100 loss=1.0054 acc=0.5386 lr=0.02730 (16.4s, ETA 349s)
+15:47:44   epoch 1 batch 50/86 loss=1.0199
+15:48:18 round 67/100 loss=1.0009 acc=0.5441 lr=0.02591 (35.6s, ETA 351s)
+15:48:21   epoch 1 batch 50/86 loss=0.8654
+15:48:43 round 68/100 loss=0.9816 acc=0.5494 lr=0.02455 (24.7s, ETA 347s)
+15:48:44   epoch 1 batch 50/86 loss=0.8331
+15:48:59 round 69/100 loss=0.9768 acc=0.5544 lr=0.02321 (16.4s, ETA 339s)
+15:49:01   epoch 1 batch 50/86 loss=0.7617
+15:49:18 round 70/100 loss=0.9752 acc=0.5574 lr=0.02190 (19.0s, ETA 331s)
+15:49:20   epoch 1 batch 50/86 loss=0.8871
+15:49:35 round 71/100 loss=0.9695 acc=0.5677 lr=0.02061 (16.5s, ETA 322s)
+15:49:36   epoch 1 batch 50/86 loss=0.9511
+15:49:51 round 72/100 loss=0.9517 acc=0.5610 lr=0.01935 (16.6s, ETA 313s)
+15:49:52   epoch 1 batch 50/86 loss=0.8412
+15:50:11 round 73/100 loss=0.9445 acc=0.5739 lr=0.01813 (19.3s, ETA 305s)
+15:50:12   epoch 1 batch 50/86 loss=1.1466
+15:50:24 round 74/100 loss=0.9385 acc=0.5690 lr=0.01693 (13.3s, ETA 295s)
+15:50:25   epoch 1 batch 50/86 loss=0.9133
+15:50:38 round 75/100 loss=0.9268 acc=0.5718 lr=0.01577 (13.8s, ETA 284s)
+15:50:39   epoch 1 batch 50/86 loss=0.8599
+15:50:52 round 76/100 loss=0.9294 acc=0.5785 lr=0.01464 (13.9s, ETA 274s)
+15:50:53   epoch 1 batch 50/86 loss=0.6521
+15:51:08 round 77/100 loss=0.9161 acc=0.5851 lr=0.01355 (15.8s, ETA 263s)
+15:51:09   epoch 1 batch 50/86 loss=0.6407
+15:51:26 round 78/100 loss=0.9091 acc=0.5813 lr=0.01249 (18.3s, ETA 254s)
+15:51:27   epoch 1 batch 50/86 loss=0.7639
+15:51:39 round 79/100 loss=0.9047 acc=0.5866 lr=0.01147 (13.5s, ETA 243s)
+15:51:40   epoch 1 batch 50/86 loss=1.0629
+15:51:55 round 80/100 loss=0.8930 acc=0.5889 lr=0.01049 (15.8s, ETA 232s)
+15:51:56   epoch 1 batch 50/86 loss=0.9478
+15:52:15 round 81/100 loss=0.8926 acc=0.5859 lr=0.00955 (19.4s, ETA 223s)
+15:52:15   epoch 1 batch 50/86 loss=0.8033
+15:52:29 round 82/100 loss=0.8909 acc=0.5851 lr=0.00865 (14.4s, ETA 211s)
+15:52:30   epoch 1 batch 50/86 loss=0.8108
+15:52:42 round 83/100 loss=0.8801 acc=0.5894 lr=0.00778 (12.6s, ETA 200s)
+15:52:42   epoch 1 batch 50/86 loss=0.7667
+15:52:54 round 84/100 loss=0.8791 acc=0.5933 lr=0.00696 (12.6s, ETA 188s)
+15:52:55   epoch 1 batch 50/86 loss=0.6801
+15:53:07 round 85/100 loss=0.8707 acc=0.5980 lr=0.00618 (12.9s, ETA 177s)
+15:53:08   epoch 1 batch 50/86 loss=0.6094
+15:53:20 round 86/100 loss=0.8682 acc=0.5950 lr=0.00545 (13.3s, ETA 165s)
+15:53:21   epoch 1 batch 50/86 loss=0.6384
+15:53:36 round 87/100 loss=0.8691 acc=0.5986 lr=0.00476 (16.0s, ETA 154s)
+15:53:37   epoch 1 batch 50/86 loss=0.5964
+15:53:49 round 88/100 loss=0.8626 acc=0.6001 lr=0.00411 (13.0s, ETA 142s)
+15:53:50   epoch 1 batch 50/86 loss=0.5902
+15:54:04 round 89/100 loss=0.8616 acc=0.6015 lr=0.00351 (14.6s, ETA 131s)
+15:54:05   epoch 1 batch 50/86 loss=0.6083
+15:54:21 round 90/100 loss=0.8603 acc=0.6062 lr=0.00296 (16.9s, ETA 119s)
+15:54:23   epoch 1 batch 50/86 loss=0.7052
+15:54:37 round 91/100 loss=0.8599 acc=0.6030 lr=0.00245 (15.7s, ETA 108s)
+15:54:37   epoch 1 batch 50/86 loss=0.7554
+15:54:57 round 92/100 loss=0.8644 acc=0.6041 lr=0.00199 (20.2s, ETA 97s)
+15:54:58   epoch 1 batch 50/86 loss=0.7229
+15:55:11 round 93/100 loss=0.8646 acc=0.6073 lr=0.00157 (13.9s, ETA 85s)
+15:55:12   epoch 1 batch 50/86 loss=0.7857
+15:55:27 round 94/100 loss=0.8723 acc=0.6089 lr=0.00120 (16.3s, ETA 73s)
+15:55:28   epoch 1 batch 50/86 loss=0.6693
+15:55:42 round 95/100 loss=0.8813 acc=0.6113 lr=0.00089 (14.9s, ETA 61s)
+15:55:43   epoch 1 batch 50/86 loss=0.8833
+15:55:57 round 96/100 loss=0.8951 acc=0.6108 lr=0.00062 (14.7s, ETA 49s)
+15:55:57   epoch 1 batch 50/86 loss=0.6208
+15:56:09 round 97/100 loss=0.9187 acc=0.6110 lr=0.00039 (12.8s, ETA 37s)
+15:56:10   epoch 1 batch 50/86 loss=0.7801
+15:56:23 round 98/100 loss=0.9510 acc=0.6137 lr=0.00022 (13.4s, ETA 24s)
+15:56:23   epoch 1 batch 50/86 loss=1.0714
+15:56:34 round 99/100 loss=1.0108 acc=0.6147 lr=0.00010 (11.7s, ETA 12s)
+15:56:35   epoch 1 batch 50/86 loss=1.0692
+15:56:48 round 100/100 loss=1.1065 acc=0.6148 lr=0.00002 (14.0s, ETA 0s)
+15:56:48 evaluating per-client accuracy...
+--- final per-client accuracy ---
+client 0: 0.6610
+client 1: 0.5266
+client 2: 0.6863
+client 3: 0.6830
+client 4: 0.5248
+client 5: 0.6603
+client 6: 0.6071
+client 7: 0.6278
+client 8: 0.6606
+client 9: 0.4389
+=== signsgd ===
+[fairfl] federated (10 clients) | strategy=signsgd model=cnn_cifar rounds=100 alpha=0.5 lr=0.1
+15:56:55 federated: device=cpu clients=10 alpha=0.5 strategy=signsgd loading CIFAR10 from data
+15:56:58 data loaded + partitioned in 3.3s; client shard sizes=[5497, 4205, 10949, 3657, 2921, 3963, 2747, 4040, 1608, 10413]
+15:57:00   epoch 1 batch 50/86 loss=1.1492
+C:\Users\Danish\personal\study\11-bpdc-me-ss\3rd Sem\fairness-in-fl\code\src\fairfl\train\engine.py:201: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  scheduler.step()
+15:57:20 round 1/100 loss=1.6429 acc=0.1001 lr=0.10000 (21.8s, ETA 2154s)
+15:57:22   epoch 1 batch 50/86 loss=1.5773
+15:57:42 round 2/100 loss=1.6722 acc=0.1002 lr=0.09998 (21.9s, ETA 2138s)
+15:57:43   epoch 1 batch 50/86 loss=1.5118
+15:58:03 round 3/100 loss=1.6579 acc=0.1008 lr=0.09990 (21.0s, ETA 2090s)
+15:58:04   epoch 1 batch 50/86 loss=1.5741
+15:58:24 round 4/100 loss=1.6640 acc=0.1011 lr=0.09978 (21.2s, ETA 2059s)
+15:58:26   epoch 1 batch 50/86 loss=1.1736
+15:58:44 round 5/100 loss=1.6499 acc=0.1010 lr=0.09961 (20.1s, ETA 2013s)
+15:58:46   epoch 1 batch 50/86 loss=1.4864
+15:58:59 round 6/100 loss=1.6340 acc=0.1012 lr=0.09938 (15.1s, ETA 1896s)
+15:59:00   epoch 1 batch 50/86 loss=1.1719
+15:59:14 round 7/100 loss=1.6228 acc=0.1007 lr=0.09911 (15.0s, ETA 1807s)
+15:59:15   epoch 1 batch 50/86 loss=1.6146
+15:59:33 round 8/100 loss=1.6542 acc=0.1017 lr=0.09880 (18.3s, ETA 1774s)
+15:59:34   epoch 1 batch 50/86 loss=1.3461
+16:00:04 round 9/100 loss=1.6268 acc=0.1006 lr=0.09843 (31.4s, ETA 1878s)
+16:00:05   epoch 1 batch 50/86 loss=1.3757
+16:00:26 round 10/100 loss=1.6418 acc=0.1012 lr=0.09801 (21.9s, ETA 1869s)
+16:00:27   epoch 1 batch 50/86 loss=1.2260
+16:00:48 round 11/100 loss=1.6326 acc=0.1031 lr=0.09755 (22.1s, ETA 1859s)
+16:00:50   epoch 1 batch 50/86 loss=1.5979
+16:01:01 round 12/100 loss=1.6357 acc=0.1032 lr=0.09704 (13.3s, ETA 1782s)
+16:01:02   epoch 1 batch 50/86 loss=1.1789
+16:01:29 round 13/100 loss=1.6173 acc=0.1057 lr=0.09649 (27.6s, ETA 1811s)
+16:01:32   epoch 1 batch 50/86 loss=1.3742
+16:01:50 round 14/100 loss=1.6439 acc=0.1057 lr=0.09589 (20.7s, ETA 1790s)
+16:01:51   epoch 1 batch 50/86 loss=1.5366
+16:02:03 round 15/100 loss=1.6198 acc=0.1137 lr=0.09524 (13.5s, ETA 1728s)
+16:02:04   epoch 1 batch 50/86 loss=1.5675
+16:02:18 round 16/100 loss=1.6225 acc=0.1147 lr=0.09455 (14.7s, ETA 1678s)
+16:02:20   epoch 1 batch 50/86 loss=1.4380
+16:02:43 round 17/100 loss=1.6065 acc=0.1170 lr=0.09382 (25.3s, ETA 1684s)
+16:02:44   epoch 1 batch 50/86 loss=1.7215
+16:02:56 round 18/100 loss=1.5927 acc=0.1197 lr=0.09304 (12.7s, ETA 1629s)
+16:02:57   epoch 1 batch 50/86 loss=1.6513
+16:03:11 round 19/100 loss=1.6044 acc=0.1210 lr=0.09222 (15.4s, ETA 1590s)
+16:03:13   epoch 1 batch 50/86 loss=1.1998
+16:03:33 round 20/100 loss=1.5866 acc=0.1206 lr=0.09135 (21.9s, ETA 1580s)
+16:03:34   epoch 1 batch 50/86 loss=1.3852
+16:03:49 round 21/100 loss=1.5876 acc=0.1164 lr=0.09045 (16.2s, ETA 1546s)
+16:03:50   epoch 1 batch 50/86 loss=1.3057
+16:04:09 round 22/100 loss=1.6039 acc=0.1138 lr=0.08951 (19.5s, ETA 1527s)
+16:04:10   epoch 1 batch 50/86 loss=1.4358
+16:04:29 round 23/100 loss=1.5976 acc=0.1128 lr=0.08853 (19.5s, ETA 1507s)
+16:04:30   epoch 1 batch 50/86 loss=1.3862
+16:04:51 round 24/100 loss=1.5850 acc=0.1127 lr=0.08751 (22.6s, ETA 1497s)
+16:04:53   epoch 1 batch 50/86 loss=1.2437
+16:05:14 round 25/100 loss=1.5871 acc=0.1118 lr=0.08645 (22.5s, ETA 1485s)
+16:05:15   epoch 1 batch 50/86 loss=1.3870
+16:05:38 round 26/100 loss=1.6039 acc=0.1119 lr=0.08536 (24.9s, ETA 1480s)
+16:05:40   epoch 1 batch 50/86 loss=1.1313
+16:06:06 round 27/100 loss=1.5707 acc=0.1113 lr=0.08423 (27.3s, ETA 1480s)
+16:06:07   epoch 1 batch 50/86 loss=1.1493
+16:06:27 round 28/100 loss=1.5753 acc=0.1157 lr=0.08307 (20.8s, ETA 1461s)
+16:06:28   epoch 1 batch 50/86 loss=1.2801
+16:06:51 round 29/100 loss=1.5900 acc=0.1175 lr=0.08187 (25.0s, ETA 1452s)
+16:06:53   epoch 1 batch 50/86 loss=1.4831
+16:07:16 round 30/100 loss=1.5600 acc=0.1219 lr=0.08065 (24.0s, ETA 1440s)
+16:07:17   epoch 1 batch 50/86 loss=1.1723
+16:07:39 round 31/100 loss=1.5513 acc=0.1306 lr=0.07939 (23.1s, ETA 1425s)
+16:07:40   epoch 1 batch 50/86 loss=1.1570
+16:08:12 round 32/100 loss=1.5503 acc=0.1390 lr=0.07810 (33.5s, ETA 1432s)
+16:08:14   epoch 1 batch 50/86 loss=1.2645
+16:08:35 round 33/100 loss=1.5564 acc=0.1526 lr=0.07679 (22.7s, ETA 1414s)
+16:08:36   epoch 1 batch 50/86 loss=1.1703
+16:08:56 round 34/100 loss=1.5542 acc=0.1631 lr=0.07545 (20.9s, ETA 1392s)
+16:08:57   epoch 1 batch 50/86 loss=1.4383
+16:09:09 round 35/100 loss=1.5472 acc=0.1744 lr=0.07409 (13.0s, ETA 1356s)
+16:09:09   epoch 1 batch 50/86 loss=1.1657
+16:09:25 round 36/100 loss=1.5286 acc=0.1868 lr=0.07270 (16.6s, ETA 1328s)
+16:09:26   epoch 1 batch 50/86 loss=1.2707
+16:09:39 round 37/100 loss=1.5473 acc=0.1933 lr=0.07129 (13.8s, ETA 1295s)
+16:09:40   epoch 1 batch 50/86 loss=1.2307
+16:09:52 round 38/100 loss=1.5478 acc=0.1963 lr=0.06986 (12.9s, ETA 1262s)
+16:09:53   epoch 1 batch 50/86 loss=1.1917
+16:10:05 round 39/100 loss=1.5345 acc=0.2010 lr=0.06841 (13.0s, ETA 1230s)
+16:10:06   epoch 1 batch 50/86 loss=1.1218
+16:10:19 round 40/100 loss=1.5495 acc=0.2035 lr=0.06694 (14.1s, ETA 1201s)
+16:10:20   epoch 1 batch 50/86 loss=1.2349
+16:10:35 round 41/100 loss=1.5246 acc=0.2075 lr=0.06545 (16.2s, ETA 1176s)
+16:10:36   epoch 1 batch 50/86 loss=1.3717
+16:10:51 round 42/100 loss=1.5071 acc=0.2135 lr=0.06395 (15.4s, ETA 1150s)
+16:10:52   epoch 1 batch 50/86 loss=1.1358
+16:11:14 round 43/100 loss=1.5220 acc=0.2163 lr=0.06243 (22.8s, ETA 1134s)
+16:11:15   epoch 1 batch 50/86 loss=1.4101
+16:11:38 round 44/100 loss=1.5252 acc=0.2166 lr=0.06091 (23.9s, ETA 1119s)
+16:11:39   epoch 1 batch 50/86 loss=1.1408
+16:11:58 round 45/100 loss=1.5074 acc=0.2180 lr=0.05937 (20.7s, ETA 1100s)
+16:12:00   epoch 1 batch 50/86 loss=1.2465
+16:12:19 round 46/100 loss=1.5035 acc=0.2203 lr=0.05782 (20.6s, ETA 1081s)
+16:12:20   epoch 1 batch 50/86 loss=1.1712
+16:12:33 round 47/100 loss=1.4828 acc=0.2287 lr=0.05627 (14.5s, ETA 1054s)
+16:12:34   epoch 1 batch 50/86 loss=1.0713
+16:12:46 round 48/100 loss=1.4911 acc=0.2295 lr=0.05471 (12.6s, ETA 1027s)
+16:12:47   epoch 1 batch 50/86 loss=1.1109
+16:12:58 round 49/100 loss=1.4776 acc=0.2367 lr=0.05314 (12.5s, ETA 999s)
+16:12:59   epoch 1 batch 50/86 loss=1.4314
+16:13:11 round 50/100 loss=1.4869 acc=0.2450 lr=0.05157 (12.8s, ETA 973s)
+16:13:12   epoch 1 batch 50/86 loss=1.6044
+16:13:24 round 51/100 loss=1.4680 acc=0.2527 lr=0.05000 (12.3s, ETA 947s)
+16:13:24   epoch 1 batch 50/86 loss=1.0964
+16:13:36 round 52/100 loss=1.4614 acc=0.2595 lr=0.04843 (11.9s, ETA 920s)
+16:13:36   epoch 1 batch 50/86 loss=1.1703
+16:13:48 round 53/100 loss=1.4594 acc=0.2673 lr=0.04686 (12.5s, ETA 895s)
+16:13:49   epoch 1 batch 50/86 loss=0.9393
+16:14:00 round 54/100 loss=1.4409 acc=0.2699 lr=0.04529 (12.2s, ETA 870s)
+16:14:01   epoch 1 batch 50/86 loss=1.2975
+16:14:13 round 55/100 loss=1.4314 acc=0.2743 lr=0.04373 (13.3s, ETA 847s)
+16:14:14   epoch 1 batch 50/86 loss=1.2975
+16:14:25 round 56/100 loss=1.4332 acc=0.2800 lr=0.04218 (11.7s, ETA 822s)
+16:14:26   epoch 1 batch 50/86 loss=1.5365
+16:14:40 round 57/100 loss=1.4330 acc=0.2848 lr=0.04063 (14.6s, ETA 801s)
+16:14:41   epoch 1 batch 50/86 loss=0.8348
+16:14:56 round 58/100 loss=1.4028 acc=0.2897 lr=0.03909 (16.4s, ETA 781s)
+16:14:58   epoch 1 batch 50/86 loss=1.1745
+16:15:18 round 59/100 loss=1.4103 acc=0.2982 lr=0.03757 (21.8s, ETA 764s)
+16:15:20   epoch 1 batch 50/86 loss=1.2689
+16:15:49 round 60/100 loss=1.3991 acc=0.3047 lr=0.03605 (31.2s, ETA 754s)
+16:15:51   epoch 1 batch 50/86 loss=1.2553
+16:16:10 round 61/100 loss=1.3909 acc=0.3110 lr=0.03455 (21.1s, ETA 736s)
+16:16:12   epoch 1 batch 50/86 loss=1.3208
+16:16:30 round 62/100 loss=1.4002 acc=0.3161 lr=0.03306 (19.5s, ETA 718s)
+16:16:31   epoch 1 batch 50/86 loss=0.8281
+16:16:43 round 63/100 loss=1.3775 acc=0.3196 lr=0.03159 (13.4s, ETA 696s)
+16:16:44   epoch 1 batch 50/86 loss=1.3572
+16:16:55 round 64/100 loss=1.3643 acc=0.3254 lr=0.03014 (11.5s, ETA 673s)
+16:16:56   epoch 1 batch 50/86 loss=1.0075
+16:17:06 round 65/100 loss=1.3561 acc=0.3305 lr=0.02871 (11.4s, ETA 650s)
+16:17:07   epoch 1 batch 50/86 loss=1.0929
+16:17:17 round 66/100 loss=1.3628 acc=0.3345 lr=0.02730 (10.6s, ETA 628s)
+16:17:17   epoch 1 batch 50/86 loss=1.1613
+16:17:26 round 67/100 loss=1.3469 acc=0.3426 lr=0.02591 (9.1s, ETA 605s)
+16:17:26   epoch 1 batch 50/86 loss=1.1543
+16:17:34 round 68/100 loss=1.3340 acc=0.3489 lr=0.02455 (8.3s, ETA 582s)
+16:17:35   epoch 1 batch 50/86 loss=1.0328
+16:17:43 round 69/100 loss=1.3210 acc=0.3532 lr=0.02321 (8.7s, ETA 559s)
+16:17:43   epoch 1 batch 50/86 loss=0.9786
+16:17:52 round 70/100 loss=1.3221 acc=0.3560 lr=0.02190 (9.1s, ETA 537s)
+16:17:53   epoch 1 batch 50/86 loss=1.3144
+16:18:06 round 71/100 loss=1.3234 acc=0.3608 lr=0.02061 (13.9s, ETA 518s)
+16:18:07   epoch 1 batch 50/86 loss=1.3008
+16:18:24 round 72/100 loss=1.2994 acc=0.3679 lr=0.01935 (17.8s, ETA 500s)
+16:18:25   epoch 1 batch 50/86 loss=0.9678
+16:18:45 round 73/100 loss=1.2894 acc=0.3731 lr=0.01813 (21.7s, ETA 483s)
+16:18:47   epoch 1 batch 50/86 loss=1.4435
+16:19:06 round 74/100 loss=1.2804 acc=0.3748 lr=0.01693 (20.6s, ETA 466s)
+16:19:07   epoch 1 batch 50/86 loss=1.1937
+16:19:19 round 75/100 loss=1.2714 acc=0.3792 lr=0.01577 (13.4s, ETA 447s)
+16:19:20   epoch 1 batch 50/86 loss=1.1950
+16:19:31 round 76/100 loss=1.2664 acc=0.3831 lr=0.01464 (11.1s, ETA 427s)
+16:19:31   epoch 1 batch 50/86 loss=1.0571
+16:19:41 round 77/100 loss=1.2624 acc=0.3888 lr=0.01355 (10.7s, ETA 407s)
+16:19:42   epoch 1 batch 50/86 loss=0.8883
+16:19:52 round 78/100 loss=1.2475 acc=0.3942 lr=0.01249 (10.6s, ETA 387s)
+16:19:53   epoch 1 batch 50/86 loss=1.1852
+16:20:09 round 79/100 loss=1.2413 acc=0.3987 lr=0.01147 (16.8s, ETA 370s)
+16:20:10   epoch 1 batch 50/86 loss=1.1940
+16:20:33 round 80/100 loss=1.2308 acc=0.4033 lr=0.01049 (24.2s, ETA 354s)
+16:20:34   epoch 1 batch 50/86 loss=1.2060
+16:20:47 round 81/100 loss=1.2264 acc=0.4060 lr=0.00955 (13.9s, ETA 335s)
+16:20:48   epoch 1 batch 50/86 loss=1.1987
+16:20:58 round 82/100 loss=1.2193 acc=0.4058 lr=0.00865 (10.8s, ETA 316s)
+16:20:58   epoch 1 batch 50/86 loss=0.9496
+16:21:08 round 83/100 loss=1.2093 acc=0.4066 lr=0.00778 (10.2s, ETA 297s)
+16:21:08   epoch 1 batch 50/86 loss=0.9030
+16:21:18 round 84/100 loss=1.2047 acc=0.4104 lr=0.00696 (10.2s, ETA 278s)
+16:21:19   epoch 1 batch 50/86 loss=1.1045
+16:21:31 round 85/100 loss=1.2006 acc=0.4144 lr=0.00618 (12.9s, ETA 260s)
+16:21:32   epoch 1 batch 50/86 loss=0.9664
+16:21:53 round 86/100 loss=1.1938 acc=0.4180 lr=0.00545 (22.4s, ETA 243s)
+16:21:55   epoch 1 batch 50/86 loss=0.9219
+16:22:12 round 87/100 loss=1.1878 acc=0.4239 lr=0.00476 (18.2s, ETA 226s)
+16:22:12   epoch 1 batch 50/86 loss=0.8983
+16:22:23 round 88/100 loss=1.1714 acc=0.4284 lr=0.00411 (11.1s, ETA 208s)
+16:22:23   epoch 1 batch 50/86 loss=0.7369
+16:22:33 round 89/100 loss=1.1704 acc=0.4310 lr=0.00351 (10.5s, ETA 190s)
+16:22:34   epoch 1 batch 50/86 loss=1.0252
+16:22:45 round 90/100 loss=1.1660 acc=0.4319 lr=0.00296 (12.1s, ETA 172s)
+16:22:46   epoch 1 batch 50/86 loss=1.1761
+16:23:03 round 91/100 loss=1.1593 acc=0.4371 lr=0.00245 (18.0s, ETA 155s)
+16:23:05   epoch 1 batch 50/86 loss=1.0961
+16:23:21 round 92/100 loss=1.1582 acc=0.4374 lr=0.00199 (17.7s, ETA 138s)
+16:23:22   epoch 1 batch 50/86 loss=0.8910
+16:23:38 round 93/100 loss=1.1548 acc=0.4420 lr=0.00157 (17.3s, ETA 120s)
+16:23:39   epoch 1 batch 50/86 loss=0.9894
+16:23:52 round 94/100 loss=1.1531 acc=0.4466 lr=0.00120 (14.2s, ETA 103s)
+16:23:53   epoch 1 batch 50/86 loss=0.8443
+16:24:04 round 95/100 loss=1.1528 acc=0.4494 lr=0.00089 (11.3s, ETA 86s)
+16:24:04   epoch 1 batch 50/86 loss=0.9569
+16:24:14 round 96/100 loss=1.1553 acc=0.4494 lr=0.00062 (10.2s, ETA 68s)
+16:24:15   epoch 1 batch 50/86 loss=0.9494
+16:24:26 round 97/100 loss=1.1657 acc=0.4490 lr=0.00039 (11.6s, ETA 51s)
+16:24:26   epoch 1 batch 50/86 loss=1.1340
+16:24:43 round 98/100 loss=1.1795 acc=0.4524 lr=0.00022 (17.9s, ETA 34s)
+16:24:45   epoch 1 batch 50/86 loss=0.9989
+16:25:02 round 99/100 loss=1.2219 acc=0.4512 lr=0.00010 (18.5s, ETA 17s)
+16:25:03   epoch 1 batch 50/86 loss=1.0919
+16:25:13 round 100/100 loss=1.3422 acc=0.4592 lr=0.00002 (11.1s, ETA 0s)
+16:25:13 evaluating per-client accuracy...
+--- final per-client accuracy ---
+client 0: 0.5160
+client 1: 0.3993
+client 2: 0.4520
+client 3: 0.5919
+client 4: 0.3777
+client 5: 0.4704
+client 6: 0.4184
+client 7: 0.4962
+client 8: 0.4716
+client 9: 0.2743
+=== fairweight ===
+[fairfl] federated (3 clients) | strategy=fairweight model=cnn_cifar rounds=50 alpha=0.5 lr=0.001
+16:25:18 federated: device=cpu clients=3 alpha=0.5 strategy=fairweight loading CIFAR10 from data
+16:25:21 data loaded + partitioned in 2.3s; client shard sizes=[11139, 11413, 27448]
++--------------------- Traceback (most recent call last) ---------------------+
+| C:\Users\Danish\personal\study\11-bpdc-me-ss\3rd                            |
+| Sem\fairness-in-fl\code\src\fairfl\cli.py:35 in train                       |
+|                                                                             |
+|   32                f"rounds={cfg.train.rounds} alpha={cfg.dataset.alpha}   |
+|      lr={cfg.train.lr}")                                                    |
+|   33                                                                        |
+|   34     result: RunResult | None = None                                    |
+| > 35     for item in run(cfg):                                              |
+|   36         if isinstance(item, RunResult):                                |
+|   37             result = item                                              |
+|   38                                                                        |
+|                                                                             |
+| C:\Users\Danish\personal\study\11-bpdc-me-ss\3rd                            |
+| Sem\fairness-in-fl\code\src\fairfl\train\engine.py:228 in run               |
+|                                                                             |
+|   225                                                                       |
+|   226 def run(cfg: RunConfig, stop_event: threading.Event | None = None) -> |
+|       Iterator[RoundResult | RunResult]:                                    |
+|   227     fn = run_centralised if cfg.is_centralised else run_federated     |
+| > 228     yield from fn(cfg, stop_event)                                    |
+|   229                                                                       |
+|                                                                             |
+| C:\Users\Danish\personal\study\11-bpdc-me-ss\3rd                            |
+| Sem\fairness-in-fl\code\src\fairfl\train\engine.py:190 in run_federated     |
+|                                                                             |
+|   187             log_every = cfg.train.log_every if c == 0 else 0  # only  |
+|       client 0 logs per-batch, avoids spam                                  |
+|   188             log_fn = (lambda ep, bi, n_batches, loss_val: log.info(   |
+|   189                 "  epoch %d batch %d/%d loss=%.4f", ep, bi,           |
+|       n_batches, loss_val))                                                 |
+| > 190             res = client_algo.fit(local_model, client_train[cid],     |
+|       ins, gen, device, client_id=cid,                                      |
+|   191                                   state=client_states[cid],           |
+|       log_every=log_every, log_fn=log_fn)                                   |
+|   192             results.append(res)                                       |
+|   193             round_loss += res.metrics["train_loss"] * res.num_samples |
++-----------------------------------------------------------------------------+
+TypeError: FairWeightClient.fit() got an unexpected keyword argument 'state'
+=== logofair ===
+[fairfl] federated (5 clients) | strategy=logofair model=cnn_cifar rounds=5 alpha=0.5 lr=0.1
+16:25:26 federated: device=cpu clients=5 alpha=0.5 strategy=logofair loading CIFAR10 from data
+16:25:29 data loaded + partitioned in 2.4s; client shard sizes=[10384, 14031, 9993, 8335, 7257]
+16:25:29   epoch 1 batch 50/163 loss=1.5576
+16:25:30   epoch 1 batch 100/163 loss=1.6298
+16:25:30   epoch 1 batch 150/163 loss=1.4469
+C:\Users\Danish\personal\study\11-bpdc-me-ss\3rd Sem\fairness-in-fl\code\src\fairfl\train\engine.py:201: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  scheduler.step()
+16:25:41 round 1/5 loss=1.6417 acc=0.1000 lr=0.10000 (12.6s, ETA 50s)
+16:25:42   epoch 1 batch 50/163 loss=1.3621
+16:25:43   epoch 1 batch 100/163 loss=1.1277
+16:25:43   epoch 1 batch 150/163 loss=1.4951
+16:25:53 round 2/5 loss=1.6064 acc=0.1472 lr=0.09045 (11.3s, ETA 36s)
+16:25:53   epoch 1 batch 50/163 loss=1.1923
+16:25:54   epoch 1 batch 100/163 loss=1.0776
+16:25:55   epoch 1 batch 150/163 loss=1.1937
+16:26:03 round 3/5 loss=1.4391 acc=0.1784 lr=0.06545 (10.9s, ETA 23s)
+16:26:04   epoch 1 batch 50/163 loss=1.0652
+16:26:05   epoch 1 batch 100/163 loss=1.2643
+16:26:05   epoch 1 batch 150/163 loss=0.9478
+16:26:18 round 4/5 loss=1.3222 acc=0.2497 lr=0.03455 (14.5s, ETA 12s)
+16:26:19   epoch 1 batch 50/163 loss=1.4441
+16:26:20   epoch 1 batch 100/163 loss=1.0516
+16:26:21   epoch 1 batch 150/163 loss=1.1684
+16:26:35 round 5/5 loss=1.2489 acc=0.2825 lr=0.00955 (17.1s, ETA 0s)
+16:29:18 evaluating per-client accuracy...
+--- final per-client accuracy ---
+client 0: 0.4154
+client 1: 0.3121
+client 2: 0.1324
+client 3: 0.1969
+client 4: 0.3958
