@@ -15,7 +15,7 @@ def code(s):
 
 
 md("""
-# fairfl: centralised vs federated CIFAR10 (ResNet18)
+# fairfl: 8 FL strategies on CIFAR10 (ResNet18)
 
 Self-contained notebook for Colab / Kaggle. No local project install needed — this cell pulls the
 `fairfl` source straight from the repo and pip-installs only what's missing.
@@ -24,7 +24,8 @@ Self-contained notebook for Colab / Kaggle. No local project install needed — 
 across sessions — otherwise `/content` is wiped on disconnect and every session re-downloads it
 (the multi-minute "loading data" wait at the start).
 
-Edit the ALL_CAPS cell below to change hyperparameters, then Run All.
+Runs every strategy in `STRATEGIES` below, one after another, each from its own YAML config under
+`code/src/fairfl/configs/`. Edit `STRATEGIES` or `OVERRIDES` and Run All.
 """)
 
 code("""
@@ -52,6 +53,7 @@ if ON_COLAB or ON_KAGGLE:
     else:
         subprocess.run(f"git clone -q --depth 1 -b {BRANCH} {REPO_URL} {REPO}", shell=True, check=True)
     SRC = REPO / "code" / "src"
+    CONFIGS_DIR = SRC / "fairfl" / "configs"
 
     if ON_COLAB and USE_DRIVE:
         from google.colab import drive
@@ -68,6 +70,7 @@ if ON_COLAB or ON_KAGGLE:
         RESULTS_DIR_DEFAULT = "../results"
 else:
     SRC = Path.cwd().parent / "src"   # running locally from code/notebooks/
+    CONFIGS_DIR = SRC / "fairfl" / "configs"
     DATA_ROOT = str(Path.cwd().parent / "data")
     RESULTS_DIR_DEFAULT = "../results"
 
@@ -83,20 +86,21 @@ print(torch.__version__, "| cuda:", torch.cuda.is_available())
 if torch.cuda.is_available():
     print(torch.cuda.get_device_name(0))
 print("data:", DATA_ROOT)
+print("configs:", CONFIGS_DIR)
 """)
 
 code("""
-# ---- CONFIG: tune these, then Run All ----
-NUM_CLIENTS = 10      # 0 = centralised (no clients, plain DL baseline)
-ROUNDS = 30           # communication rounds (FL) or epochs (centralised)
-LOCAL_EPOCHS = 5      # local epochs per client per round (FL only)
-ALPHA = 0.5           # Dirichlet concentration; lower = more non-IID
-LR = 0.1              # SGD initial lr; cosine-annealed to 0 over ROUNDS
-WEIGHT_DECAY = 5e-4
-BATCH_SIZE = 64
+# ---- CONFIG: which strategies to run, and any overrides on top of their YAML configs ----
+# Each name maps to code/src/fairfl/configs/<name>.yaml. fedcda is excluded by default: its
+# selection mechanism only activates after a 50-round warmup, so it needs its own call (see
+# docs/meeting-notes/2026-10-08.md) before it's folded into this list.
+STRATEGIES = ["median", "signsgd", "fairrfl", "fcfl", "fedmut", "fairweight", "fedfdp", "logofair"]
+
+# Dotted overrides applied to every strategy's YAML, same syntax as `fairfl train --set`.
+# data_root/device are injected here regardless, so configs stay environment-agnostic.
+OVERRIDES = []
+
 SEED = 0
-DEVICE = "auto"       # "auto", "cpu", "cuda"
-LOG_EVERY = 50        # log every N batches; 0 = off
 RESULTS_DIR = RESULTS_DIR_DEFAULT   # set above; Drive/Kaggle-persistent path when available
 """)
 
@@ -107,53 +111,58 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefm
 """)
 
 code("""
-# ---- run ----
+# ---- run: every strategy in STRATEGIES, one after another, each saved as its own json ----
 import time, json
 from pathlib import Path
 from fairfl.config import RunConfig
 from fairfl.train.engine import RunResult, run
 
-cfg = RunConfig(
-    num_clients=NUM_CLIENTS, rounds=ROUNDS, local_epochs=LOCAL_EPOCHS, alpha=ALPHA,
-    lr=LR, weight_decay=WEIGHT_DECAY, batch_size=BATCH_SIZE, seed=SEED, data_root=DATA_ROOT, device=DEVICE,
-    log_every=LOG_EVERY,
-)
-mode = "centralised" if cfg.is_centralised else f"federated ({cfg.num_clients} clients)"
-print(f"[fairfl] {mode} | rounds={cfg.rounds} alpha={cfg.alpha} lr={cfg.lr} device={cfg.device}")
-
-t0 = time.time()
-result = None
-for item in run(cfg):
-    if isinstance(item, RunResult):
-        result = item
-print(f"total time: {(time.time() - t0) / 60:.1f} min")
-
-print("--- final per-client accuracy ---")
-for c, acc in sorted(result.client_acc.items()):
-    print(f"client {c}: {acc:.4f}")
-""")
-
-code("""
-# ---- save results (json) so the plot cell below can be re-run without retraining ----
+device = "cuda" if torch.cuda.is_available() else "cpu"
 out_dir = Path(RESULTS_DIR)
 out_dir.mkdir(parents=True, exist_ok=True)
-tag = "centralised" if cfg.is_centralised else f"federated_c{cfg.num_clients}_a{cfg.alpha}"
-out_path = out_dir / f"{tag}_seed{cfg.seed}.json"
-payload = {
-    "config": cfg.model_dump(),
-    "history": [h.__dict__ for h in result.history],
-    "client_acc": {str(k): v for k, v in result.client_acc.items()},
-}
-out_path.write_text(json.dumps(payload, indent=2))
-print("saved ->", out_path)
+saved_paths = []
+
+for name in STRATEGIES:
+    cfg_path = CONFIGS_DIR / f"{name}.yaml"
+    overrides = [f"dataset.data_root={DATA_ROOT}", f"train.device={device}", f"dataset.seed={SEED}", *OVERRIDES]
+    cfg = RunConfig.from_yaml_and_overrides(cfg_path, overrides)
+
+    mode = "centralised" if cfg.is_centralised else f"federated ({cfg.dataset.num_clients} clients)"
+    print(f"\\n=== {name} ===")
+    print(f"[fairfl] {mode} | strategy={cfg.strategy.name} model={cfg.model.name} "
+          f"rounds={cfg.train.rounds} alpha={cfg.dataset.alpha} lr={cfg.train.lr} device={cfg.train.device}")
+
+    t0 = time.time()
+    result = None
+    for item in run(cfg):
+        if isinstance(item, RunResult):
+            result = item
+    elapsed_min = (time.time() - t0) / 60
+    print(f"{name}: total time {elapsed_min:.1f} min")
+
+    print("--- final per-client accuracy ---")
+    for c, acc in sorted(result.client_acc.items()):
+        print(f"client {c}: {acc:.4f}")
+
+    out_path = out_dir / f"{name}_c{cfg.dataset.num_clients}_a{cfg.dataset.alpha}_seed{cfg.dataset.seed}.json"
+    payload = {
+        "config": cfg.model_dump(),
+        "history": [h.__dict__ for h in result.history],
+        "client_acc": {str(k): v for k, v in result.client_acc.items()},
+        "elapsed_min": elapsed_min,
+    }
+    out_path.write_text(json.dumps(payload, indent=2))
+    saved_paths.append(out_path)
+    print("saved ->", out_path)
+
+print("\\nall done:", [str(p) for p in saved_paths])
 """)
 
 md("""
 ## Plot: accuracy across clients
 
-x-axis = client id (0 = centralised / server-only, i.e. plain DL baseline), y-axis = test accuracy.
-Re-run this cell (without retraining) to combine multiple saved result files, e.g. a centralised run
-plus a federated run, on the same chart.
+x-axis = client id, y-axis = test accuracy, one colour per strategy. Re-run this cell (without
+retraining) to combine any set of saved result files.
 """)
 
 code("""
@@ -163,22 +172,22 @@ import seaborn as sns
 
 sns.set_theme(style="whitegrid", palette="deep", font_scale=1.05)
 
-RESULT_FILES = [out_path]   # add more Path(...) entries here to compare multiple runs
+RESULT_FILES = saved_paths   # defaults to everything just run; replace with specific Path(...) entries to compare a subset
 
 rows = []
 for p in RESULT_FILES:
     d = json.loads(Path(p).read_text())
-    label = "centralised" if d["config"]["num_clients"] == 0 else f"federated (n={d['config']['num_clients']}, a={d['config']['alpha']})"
+    label = d["config"]["strategy"]["name"]
     for k, v in d["client_acc"].items():
-        rows.append({"client": int(k), "accuracy": v, "run": label})
+        rows.append({"client": int(k), "accuracy": v, "strategy": label})
 df_clients = pd.DataFrame(rows)
 
-fig, ax = plt.subplots(figsize=(7.5, 4.5))
-sns.barplot(data=df_clients, x="client", y="accuracy", hue="run", ax=ax)
-ax.set_xlabel("client (0 = centralised/server-only)")
+fig, ax = plt.subplots(figsize=(9, 4.5))
+sns.barplot(data=df_clients, x="client", y="accuracy", hue="strategy", ax=ax)
+ax.set_xlabel("client")
 ax.set_ylabel("test accuracy")
 ax.set_ylim(0, 1)
-ax.set_title("Accuracy across clients")
+ax.set_title("Accuracy across clients, by strategy")
 sns.despine()
 plt.savefig(Path(RESULTS_DIR) / "client_accuracy.png", dpi=150, bbox_inches="tight")
 plt.show()
@@ -187,25 +196,24 @@ plt.show()
 md("""
 ## Plot: accuracy over rounds
 
-x-axis = round (communication round for FL, epoch for centralised), y-axis = global test accuracy.
-Same `RESULT_FILES` list as above, so both runs overlay on one chart.
+x-axis = communication round, y-axis = global test accuracy, one line per strategy.
 """)
 
 code("""
 rows = []
 for p in RESULT_FILES:
     d = json.loads(Path(p).read_text())
-    label = "centralised" if d["config"]["num_clients"] == 0 else f"federated (n={d['config']['num_clients']}, a={d['config']['alpha']})"
+    label = d["config"]["strategy"]["name"]
     for h in d["history"]:
-        rows.append({"round": h["round"], "accuracy": h["test_acc"], "run": label})
+        rows.append({"round": h["round"], "accuracy": h["test_acc"], "strategy": label})
 df_rounds = pd.DataFrame(rows)
 
-fig, ax = plt.subplots(figsize=(7.5, 4.5))
-sns.lineplot(data=df_rounds, x="round", y="accuracy", hue="run", marker="o", ax=ax)
+fig, ax = plt.subplots(figsize=(9, 4.5))
+sns.lineplot(data=df_rounds, x="round", y="accuracy", hue="strategy", marker="o", ax=ax)
 ax.set_xlabel("round")
 ax.set_ylabel("global test accuracy")
 ax.set_ylim(0, 1)
-ax.set_title("Accuracy over rounds")
+ax.set_title("Accuracy over rounds, by strategy")
 sns.despine()
 plt.savefig(Path(RESULTS_DIR) / "accuracy_over_rounds.png", dpi=150, bbox_inches="tight")
 plt.show()
