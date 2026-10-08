@@ -63,7 +63,7 @@ class FCFL(Strategy):
         self.info = {"Q": self.Q.round(4).tolist()}
         return {cid: FitIns(state=global_state, config={"lr": round_lr, "report_train_acc": True}) for cid in chosen}
 
-    def aggregate(self, rnd, global_state, results):
+    def aggregate(self, rnd, global_state, results, round_lr):
         p = [self.weights[r.client_id] for r in results]
         self.acc_est = float(sum(pi * r.metrics["train_acc"] for pi, r in zip(p, results)) / sum(p))
         self.last_p = np.zeros(self.num_clients)

@@ -19,7 +19,7 @@ class Median(Strategy):
 
     Params = MedianParams
 
-    def aggregate(self, rnd, global_state, results):
+    def aggregate(self, rnd, global_state, results, round_lr):
         out = {}
         for key, g in global_state.items():
             if not g.is_floating_point():

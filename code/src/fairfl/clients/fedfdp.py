@@ -36,7 +36,10 @@ class FedFDPClient(ClientAlgorithm):
 
     sampling = "poisson" (paper): each round, draw one batch B with inclusion probability q, take `dp_steps`
     DP-SGD steps w <- w - eta/|B| (sum_j C_ij g_j + sigma C N(0, I)), with fair clip
-    C_ij = min(1 + lambda (F(w; j) - F~(w_t)), C / ||g_j||). Then upload
+    C_ij = min(1 + lambda (F(w; j) - F~(w_t)), C / ||g_j||). Confirmed verbatim against the paper (Eq 13): with
+    the paper's default C=0.1 ("small C"), the paper's own Section 4.1 states the DP term dominates and the
+    fairness scaling rarely binds -- this is intentional per the paper, not a bug; the fairness term matters
+    more at larger C. Then upload
     F~_i = (sum_j clip(F(w_new; j), 0, C_l) + sigma_l C_l N(0, 1)) / |B|, with the adaptive bound C_l = previous
     round's upload (C_l^0 given). sampling = "batches": epochs over fixed-size shuffled batches (for tests).
     """
@@ -80,7 +83,11 @@ class FedFDPClient(ClientAlgorithm):
                     scale = torch.minimum(torch.ones_like(norms), C / norms)
                 else:
                     delta = per_loss(tuple(params), X, y).detach() - float(f_glob)
-                    scale = torch.minimum(1.0 + lam * delta, C / norms)
+                    # Floored at 0, same as FedFairClient.batch_loss: a sample far below the global loss
+                    # would otherwise make 1 + lambda*delta negative, reversing that sample's gradient
+                    # (ascent instead of descent). Eq. 13 in the paper doesn't discuss this case.
+                    fair_term = (1.0 + lam * delta).clamp_min(0.0)
+                    scale = torch.minimum(fair_term, C / norms)
                 s = (flat * scale[:, None]).sum(0)
                 clipped = s if clipped is None else clipped + s
             noisy = clipped + sigma * C * torch.randn(clipped.shape[0], generator=gen).to(device)

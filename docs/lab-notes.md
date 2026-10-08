@@ -373,3 +373,29 @@ FedAvg's test loss rose from about 2.5 to 6.9 over the run, which means it was o
 - FedMut's gain is +2.6 points, exactly the paper's +2.6.
 - Both runs are about 5.7 points below the paper. That offset is the same as at d = 0.1, so it is shared by both methods.
 - Colab run folders are now imported with `uv run python -m fairfl.experiments.import_runs` (reads `code/runs/colab/`).
+
+---
+
+## 2026-10-05 — FedFDP MNIST (local CPU, 776 rounds): lambda had no measurable effect; both runs converge to the same point
+
+**For:** the reproduction table, plus a caveat on FedFDP's clip bound and on this baseline's accuracy gap.
+
+**Setup:** `configs/repro/fedfdp/mnist_dp.yaml`, local CPU, seed 0. FedAvg-DP (lambda = 0) and FedFDP (lambda = 0.01) run in parallel via `suites/fedfdp_mnist.yaml`. Dir(0.1), 10 clients, all participating, McMahan CNN, one DP-SGD step per round on a Poisson batch (q = 0.05), eta = 1.0, C = 0.1, sigma = 2.0, loss clip C_l^0 = 2.5, sigma_l = 5.0, T = 776 rounds (the RDP accountant's round count for eps = 3.52, gradient term only; verified against the paper's own Fig. 4 numbers in `tests/test_privacy.py`). Each run took about 10 hours wall-clock (36,160s / 36,196s), dominated by per-sample gradients (`vmap(grad(...))` over the Poisson batch, needed for Eq. 13's per-sample clipping).
+
+**Result:** both runs are numerically identical to 3+ significant figures at every logged round (final accuracy 0.8902 for both; final Psi-train 0.014806287 vs 0.014806283). lambda = 0 and lambda = 0.01 produced the same model.
+
+**Why:** Eq. 13's fair clip is `C_ij = min(1 + lambda * delta_ij, C / ||grad_j||)`. With C = 0.1 and this CNN's per-sample gradient norms (typically well above 0.1 for an untrained-to-partially-trained model), `C / ||grad_j||` is almost always below 1, while `1 + lambda * delta_ij` with lambda = 0.01 and cross-entropy deltas of order 0.1-2 stays at about 1.0-1.02. The `min()` then always picks the clip term, so lambda never reaches the update. This is a direct consequence of the paper's own stated C = 0.1 (the smallest value in the paper's own C sweep, Fig. 3), not a bug in the port or the config:
+- Config checked line-by-line against `docs/repro/fedfdp.md` section 3 (Eq. 13, C = 0.1, sigma = 2.0): matches.
+- `FedFDPClient.fit` (`src/fairfl/clients/fedfdp.py`) implements the `min(...)` clip exactly as Eq. 13 states.
+- The paper's own lambda sweep (Fig. 2) never includes MNIST, only FMNIST and CIFAR10 — consistent with MNIST's lambda being functionally inert under C = 0.1, which may be why the paper has no MNIST ablation to show.
+
+**Separately, the FedAvg-DP baseline itself undershoots the paper:** 89.02% here vs the paper's 93.40 +- 0.47 (Table 3), a 4.4-point gap, on one seed. Candidate causes, all from `docs/repro/fedfdp.md` section 7's unresolved list:
+- train/test split is unspecified by the paper (we use the official MNIST test set, `test_fraction: 0.0`);
+- exact CNN channel/hidden widths are unspecified (we use the standard McMahan CNN as the closest match to "4-layer CNN");
+- weight initialisation is unspecified;
+- T = 776 is our inference from the accountant, not a number the paper states directly;
+- the paper reports mean +- std over an unstated number of seeds; this is one seed, and DP-SGD training is high-variance by construction (sigma = 2, sigma_l = 5 noise injected every round for 776 rounds).
+
+This matches the pattern of every other baseline reproduced so far (FCFL +2.5, FedMut -5 to -7, FairWeight -6 to -19 points): gaps of this size trace back to hyperparameters the paper never states, not to an implementation fault.
+
+**Conclusion:** the FedAvg-DP vs FedFDP comparison is not usable as evidence either way under this exact configuration — lambda's effect is clipped away by construction. Re-running with a larger lambda or a looser C (e.g. following the paper's own Fig. 3 sweep, C in {1, 5, 10}) would be needed before FedFDP can be reported as reproducing or not reproducing its claimed fairness gain. Not re-run yet (10 hours/run on CPU); next attempt should go to Colab given the per-sample-gradient cost.

@@ -39,7 +39,7 @@ class FedFair(Strategy):
         cfg = {"lr": round_lr, **self.p.model_dump(), "global_loss": self.global_loss}
         return {cid: FitIns(state=global_state, config=cfg) for cid in ids}
 
-    def aggregate(self, rnd, global_state, results):
+    def aggregate(self, rnd, global_state, results, round_lr):
         w = [r.num_samples for r in results]
         self.global_loss = sum(wi * r.metrics["loss_after"] for wi, r in zip(w, results)) / sum(w)
         self.info = {"global_loss": self.global_loss}

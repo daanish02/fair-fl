@@ -6,6 +6,11 @@ from pydantic import BaseModel, Field
 from fairfl.registry import register_strategy
 from fairfl.strategies.base import Strategy
 
+# BatchNorm running stats are floating-point buffers, not gradients: a client's reported delta for
+# these reflects local forward-pass statistics, not a step to vote on the sign of. Sign-voting them
+# would move them by a fixed +/-step regardless of magnitude, corrupting the running averages.
+_BN_BUFFER_SUFFIXES = ("running_mean", "running_var")
+
 
 class SignSGDParams(BaseModel):
     step: float = Field(0.001, gt=0.0, description="Server step delta: x <- x - delta * sign(sum_i sign(g_i + b xi_i)).")
@@ -23,12 +28,16 @@ class SignSGD(Strategy):
 
     Params = SignSGDParams
 
-    def aggregate(self, rnd, global_state, results):
-        lr = self.train_cfg.lr
+    def aggregate(self, rnd, global_state, results, round_lr):
+        lr = round_lr  # gradient recovery must use the lr clients actually trained with (cosine-decayed per round)
         out = {}
         for key, g in global_state.items():
             if not g.is_floating_point():
                 out[key] = results[0].state[key]
+                continue
+            if key.endswith(_BN_BUFFER_SUFFIXES):
+                weights = [r.num_samples for r in results]
+                out[key] = sum(r.state[key] * w for r, w in zip(results, weights)) / sum(weights)
                 continue
             vote = torch.zeros_like(g)
             for r in results:

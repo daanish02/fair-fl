@@ -48,7 +48,10 @@ class FairWeightClient(ClientAlgorithm):
             log_fn=None) -> FitRes:
         res = super().fit(model, ds, ins, gen, device, client_id, state, augment, log_every, log_fn)
         model.load_state_dict(res.state)
-        theta, key_shapes = flatten_state(res.state)
+        # Gradients only exist for trainable parameters, never for buffers (e.g. BatchNorm running stats), so the
+        # Shapley-style importance flatten must be restricted to parameter keys only, not all floating-point state.
+        param_keys = {k for k, _ in model.named_parameters()}
+        theta, key_shapes = flatten_state(res.state, keys=param_keys)
         X, y, a = ds.X.to(device), ds.y.to(device), ds.a.to(device)
         with torch.no_grad():
             pred = model(X).argmax(1)

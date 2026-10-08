@@ -34,17 +34,14 @@ class FitRes:
     metrics: dict = field(default_factory=dict)
 
 
-@dataclass
-class EvalRes:
-    client_id: int
-    num_samples: int
-    loss: float
-    accuracy: float
+def flatten_state(state: dict, keys: set[str] | None = None) -> tuple[torch.Tensor, list[tuple[str, torch.Size]]]:
+    """Flatten a state_dict's floating-point tensors into one vector, plus (key, shape) to unflatten.
 
-
-def flatten_state(state: dict) -> tuple[torch.Tensor, list[tuple[str, torch.Size]]]:
-    """Flatten a state_dict's floating-point tensors into one vector, plus (key, shape) to unflatten."""
-    key_shapes = [(k, v.shape) for k, v in state.items() if v.is_floating_point()]
+    `keys`, if given, restricts which floating-point keys are included (e.g. trainable parameters only,
+    excluding buffers like BatchNorm running stats that have no gradient to compute Shapley-style importance for).
+    """
+    key_shapes = [(k, v.shape) for k, v in state.items()
+                  if v.is_floating_point() and (keys is None or k in keys)]
     vector = torch.cat([state[k].flatten() for k, _ in key_shapes])
     return vector, key_shapes
 
@@ -97,10 +94,10 @@ class Strategy(ABC):
         return []
 
     def configure_round(self, rnd: int, global_state: dict, ids: list[int],
-                        pre_eval: dict[int, EvalRes], round_lr: float) -> dict[int, FitIns]:
+                        pre_eval: dict[int, float], round_lr: float) -> dict[int, FitIns]:
         return {cid: FitIns(state=global_state, config={"lr": round_lr}) for cid in self.sample_clients(ids)}
 
-    def aggregate(self, rnd: int, global_state: dict, results: list[FitRes]) -> dict:
+    def aggregate(self, rnd: int, global_state: dict, results: list[FitRes], round_lr: float) -> dict:
         return weighted_mean([r.state for r in results], [r.num_samples for r in results])
 
     def make_client(self) -> "ClientAlgorithm":

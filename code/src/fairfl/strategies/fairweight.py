@@ -46,9 +46,14 @@ class FairWeight(Strategy):
         cfg = {"lr": round_lr, **self.p.model_dump(include={"top_fraction", "fair_weight", "repeats", "max_samples"})}
         return {cid: FitIns(state=global_state, config=cfg) for cid in ids}
 
-    def aggregate(self, rnd, global_state, results):
-        _, key_shapes = flatten_state(global_state)
-        stack = torch.stack([flatten_state(r.state)[0] for r in results])
+    def aggregate(self, rnd, global_state, results, round_lr):
+        # Client-side masks index into parameter-only space (clients/fairweight.py restricts the Shapley flatten
+        # to trainable parameters, since buffers like BatchNorm running stats have no gradient); mirror that here
+        # so a mask index means the same coordinate on both sides. Buffers aren't in state_dict's own metadata,
+        # so they're excluded by the standard PyTorch naming convention instead.
+        param_keys = {k for k in global_state if not k.endswith(("running_mean", "running_var", "num_batches_tracked"))}
+        _, key_shapes = flatten_state(global_state, keys=param_keys)
+        stack = torch.stack([flatten_state(r.state, keys=param_keys)[0] for r in results])
         out = stack.mean(dim=0)
         masks = [set(r.metrics.get("mask", [])) for r in results]
         coords = sorted(set().union(*masks))

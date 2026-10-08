@@ -44,7 +44,7 @@ class FedCDA(Strategy):
         mean = {k: torch.stack([w[k] for w, _ in models]).mean(0) for k in keys}
         return sum(f + L / 2 * _dot(w, w) for w, f in models) / len(models) - L / 2 * _dot(mean, mean)
 
-    def aggregate(self, rnd, global_state, results):
+    def aggregate(self, rnd, global_state, results, round_lr):
         for r in results:
             self.cache.setdefault(r.client_id, deque(maxlen=self.p.K)).append(
                 (r.state, float(r.metrics["train_loss"])))

@@ -48,7 +48,7 @@ class FedMut(Strategy):
             else [global_state] * len(chosen)
         return {cid: FitIns(state=w, config={"lr": round_lr}) for cid, w in zip(chosen, states)}
 
-    def aggregate(self, rnd, global_state, results):
+    def aggregate(self, rnd, global_state, results, round_lr):
         weights = [r.num_samples if self.p.weighted else 1.0 for r in results]
         w_glob = weighted_mean([r.state for r in results], weights)
         m = len(results)

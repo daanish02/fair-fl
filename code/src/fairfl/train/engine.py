@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from collections.abc import Iterator
@@ -95,6 +96,7 @@ def run_centralised(cfg: RunConfig, stop_event: threading.Event | None = None) -
     test_ds = load_cifar10(cfg.dataset.data_root, "test").to(device)
     log.info("data loaded in %.1fs (train=%d test=%d)", time.perf_counter() - t_data, len(train_ds), len(test_ds))
 
+    torch.manual_seed(cfg.dataset.seed)  # model init uses the global RNG; seed it so cfg.dataset.seed is reproducible
     model = get_model(cfg.model.name)(num_classes=10).to(device)
     opt = torch.optim.SGD(model.parameters(), lr=cfg.train.lr, momentum=cfg.train.momentum,
                           weight_decay=cfg.train.weight_decay)
@@ -133,15 +135,29 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
     train_ds = load_cifar10(cfg.dataset.data_root, "train")
     test_ds = load_cifar10(cfg.dataset.data_root, "test").to(device)
 
-    parts = dirichlet_partition(train_ds.y.numpy(), cfg.dataset.num_clients, cfg.dataset.alpha, rng)
-    client_train = [train_ds.subset(idx).to(device) for idx in parts]
+    parts, class_props = dirichlet_partition(train_ds.y.numpy(), cfg.dataset.num_clients, cfg.dataset.alpha, rng)
+    # Hold out a validation slice from each client's own train partition (stratified by label), for strategies
+    # that need to tune on something other than the final-report test set (e.g. FCFL's configure_eval).
+    client_train, client_val = [], []
+    for idx in parts:
+        labels = train_ds.y.numpy()[idx]
+        val_mask = np.zeros(len(idx), dtype=bool)
+        for k in np.unique(labels):
+            k_idx = np.flatnonzero(labels == k)
+            n_val = max(1, int(round(0.2 * len(k_idx))))
+            val_mask[rng.permutation(k_idx)[:n_val]] = True
+        client_train.append(train_ds.subset(idx[~val_mask]).to(device))
+        client_val.append(train_ds.subset(idx[val_mask]).to(device))
 
-    client_test_idx = dirichlet_partition(test_ds.y.cpu().numpy(), cfg.dataset.num_clients, cfg.dataset.alpha, rng,
-                                          min_samples=5)
+    # Test partition reuses train's per-class proportions, so a client's test slice has the same label mix
+    # as its train slice, instead of an independent (and often very different) random draw.
+    client_test_idx, _ = dirichlet_partition(test_ds.y.cpu().numpy(), cfg.dataset.num_clients, cfg.dataset.alpha,
+                                             rng, min_samples=5, class_props=class_props)
     client_test = [test_ds.subset(idx) for idx in client_test_idx]
     log.info("data loaded + partitioned in %.1fs; client shard sizes=%s",
               time.perf_counter() - t_data, [len(c) for c in client_train])
 
+    torch.manual_seed(cfg.dataset.seed)  # model init uses the global RNG; seed it so cfg.dataset.seed is reproducible
     global_model = get_model(cfg.model.name)(num_classes=10).to(device)
     local_model = get_model(cfg.model.name)(num_classes=10).to(device)  # reused scratch model, avoids per-client deepcopy
 
@@ -155,13 +171,10 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
     history = []
     t_start = time.perf_counter()
 
-    # cosine-decay the lr by communication round (all clients in a round share the same lr, by default)
-    dummy_opt = torch.optim.SGD([torch.zeros(1, requires_grad=True)], lr=cfg.train.lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(dummy_opt, T_max=cfg.train.rounds)
-
     for r in range(1, cfg.train.rounds + 1):
         t0 = time.perf_counter()
-        round_lr = dummy_opt.param_groups[0]["lr"]
+        # cosine-decay the lr by communication round (all clients in a round share the same lr, by default)
+        round_lr = cfg.train.lr * 0.5 * (1 + math.cos(math.pi * (r - 1) / cfg.train.rounds))
         global_state = global_model.state_dict()
 
         eval_ids = strategy.configure_eval(r, ids)
@@ -169,8 +182,10 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
         if eval_ids:
             for cid in eval_ids:
                 global_model.load_state_dict(global_state)
-                acc = _eval_acc(global_model, client_test[cid].to(device), device, client_id=cid)
-                pre_eval[cid] = acc  # minimal EvalRes stand-in; strategies needing more fields extend this later
+                # Each client's own held-out local data, not the final-report test split (FCFL's paper: Acc_i^t is
+                # "accuracy of the current global model evaluated on client i's own local data").
+                acc = _eval_acc(global_model, client_val[cid], device, client_id=cid)
+                pre_eval[cid] = acc
 
         fit_ins = strategy.configure_round(r, global_state, ids, pre_eval, round_lr)
         if strategy.needs_loss_before:
@@ -197,8 +212,7 @@ def run_federated(cfg: RunConfig, stop_event: threading.Event | None = None) -> 
             break
         round_loss /= sum(res.num_samples for res in results)
 
-        global_model.load_state_dict(strategy.aggregate(r, global_state, results))
-        scheduler.step()
+        global_model.load_state_dict(strategy.aggregate(r, global_state, results, round_lr))
 
         acc = _eval_acc(global_model, test_ds, device, strategy.decision_rule())
         elapsed = time.perf_counter() - t0

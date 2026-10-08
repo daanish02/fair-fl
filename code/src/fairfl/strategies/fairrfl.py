@@ -66,7 +66,7 @@ class FairRFL(Strategy):
         self.last_loss: dict[int, float] = {}
         self.l_med: float | None = None
 
-    def aggregate(self, rnd, global_state, results):
+    def aggregate(self, rnd, global_state, results, round_lr):
         recovered_per_key = {}
         flagged_ids = set()
         for key, g in global_state.items():
@@ -95,7 +95,7 @@ class FairRFL(Strategy):
         for r in results:
             li = self.last_loss.get(r.client_id)
             qs.append(self.p.q if self.l_med is None or not li else self.p.q * self.l_med / li)
-        new = qffl_step(global_state, recovered_results, qs, self.train_cfg.lr)
+        new = qffl_step(global_state, recovered_results, qs, round_lr)
         for r in results:
             self.last_loss[r.client_id] = float(r.metrics["loss_before"])
         self.l_med = float(np.median([r.metrics["loss_before"] for r in results]))

@@ -3,7 +3,7 @@
 # official code uses 0.5 -- UNVERIFIED here, paper text wins), batch=50, local
 # epochs=5, Dirichlet d in {0.1, 0.5, 1.0} (paper's own notation, not "alpha"/"beta").
 # alpha(radius)=4.0 confirmed for all cases. mut_acc_rate(beta_0)=0.3 for CNN/VGG,
-# 0.5 for ResNet-18 -- confirmed exactly; this config uses cnn_cifar so 0.3 applies.
+# 0.5 for ResNet-18 -- confirmed exactly; this config uses resnet18 so 0.5 applies.
 # mut_bound (T_b numeric value) and num_clients/participation-rate are NOT stated in
 # the paper text (only inferable from a 0-1000 round axis on a figure) -- GAP, using
 # archive's unverified "100 clients, 10%/round, 1000 rounds, mut_bound=50" guess.
@@ -31,6 +31,6 @@ strategy:
   name: fedmut
   params:
     radius: 4.0
-    mut_acc_rate: 0.3
+    mut_acc_rate: 0.5
     mut_bound: 50
     weighted: false
