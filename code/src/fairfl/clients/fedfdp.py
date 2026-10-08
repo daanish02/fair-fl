@@ -58,7 +58,11 @@ class FedFDPClient(ClientAlgorithm):
 
         per_grad = vmap(grad(sample_loss), in_dims=(None, 0, 0))
         per_loss = vmap(sample_loss, in_dims=(None, 0, 0))
-        model.train()
+        # eval mode: BatchNorm would otherwise mutate its running-stats buffer in place on every
+        # forward pass, which torch.func.grad/vmap forbid during the transform (illegal in-place
+        # write to a captured tensor). Standard DP-SGD practice uses the stored running stats
+        # instead of updating them per microbatch (same reason Opacus swaps BatchNorm for GroupNorm).
+        model.eval()
         params = [p.detach().clone() for p in model.parameters()]
 
         chunk = int(c.get("grad_chunk", 64))
