@@ -1,0 +1,611 @@
+LoGoFair — extraction from PDF (docs/impl-papers/Logofair.pdf)
+================================================================
+NOTE ON SOURCE COMPLETENESS: The PDF read cover-to-cover is 9 pages (AAAI-25
+proceedings pages 22470-22478): title/abstract, Introduction, Related Work,
+Preliminaries, Method (Theorem 1 + post-processing procedure), Experiments,
+Conclusion, References. The paper repeatedly refers to "Appendix A" (proof /
+examples of the fairness metric in FL), "Appendix B" (proof of Theorem 1),
+"Appendix C" (Algorithm 1 — the actual federated post-processing procedure,
+pseudocode, plus efficiency/privacy analysis), and "Appendix D" (D.1 dataset
+and experimental-setting details, D.3 full EO-metric result tables). THESE
+APPENDICES ARE NOT PRESENT IN THIS PDF. Any value that would only be stated
+in those appendices (e.g. exact architecture description, exact train/test
+split code, exact beta value, exact lr/inner_lr/inner_steps, exact
+post_rounds-to-convergence number, full EO tables) is NOT available from
+this document and is marked "NOT STATED IN AVAILABLE TEXT" below rather than
+guessed. Where the main body gives a number directly (e.g. number of clients
+= 5, fairness slack delta = 0.01, convergence within 10 communication
+rounds), it is quoted exactly with page/section attribution.
+
+1. CITATION
+-----------
+Zhang, Li; Chen, Chaochao (corresponding author); Han, Zhongxuan; Zhong,
+Qiyong; Zheng, Xiaolin. "LoGoFair: Post-Processing for Local and Global
+Fairness in Federated Learning." Proceedings of the AAAI Conference on
+Artificial Intelligence (AAAI-25), The Thirty-Ninth AAAI Conference on
+Artificial Intelligence, 2025. Pages 22470-22478. Copyright 2025, Association
+for the Advancement of Artificial Intelligence. Affiliation: Zhejiang
+University.
+
+2. PROBLEM SETUP
+-----------------
+The paper addresses group fairness (demographic parity / equalized odds) in
+federated learning, distinguishing LOCAL fairness (unbiased predictions
+evaluated on each client's own local data distribution) from GLOBAL fairness
+(unbiased predictions evaluated on the pooled distribution across all
+clients). Under statistical heterogeneity across clients, the paper states
+(citing Hamman and Dutta 2024, and its own Figure 1b illustration) that
+neither local fairness implies global fairness nor vice versa — this is
+"Challenge 1" (CH1) the paper sets out to solve. "Challenge 2" (CH2) is that
+most prior fair-FL work uses in-processing (intervening during training),
+which is costly to retrain, communication-heavy, and privacy-invasive; the
+paper instead frames fairness as a POST-PROCESSING problem over an
+already-trained probabilistic classifier, searching for a model-agnostic
+calibration of a pre-trained federated model. The target is explicitly the
+BAYES-OPTIMAL classifier under BOTH local and global fairness constraints
+simultaneously — i.e., the classifier h that minimizes misclassification
+risk R(h) subject to the local and global fairness-violation measures being
+below given thresholds (delta_l, delta_g). This is claimed (Introduction,
+Contributions) to be the first method offering both local and global
+fairness guarantees in FL.
+
+3. ALGORITHM
+-------------
+Setup / notation (Sec 3.1-3.2, page 22472-22473):
+- Random tuple (X, A, Y): X in feature space R^d, Y in {0,1} (binary
+  classification), sensitive attribute A in {-1, 1} (two sensitive groups,
+  "without loss of generality... this paper concentrates on two sensitive
+  groups").
+- FL system: |C| clients, client c has local dataset D_c with samples
+  (x_{c,i}, a_{c,i}, y_{c,i}), i in [N_c].
+- Bayes score function extended to FL: eta(x,a,c) := P(Y=1 | X=x, A=a, C=c)
+  — Eq. (1).
+- Fairness metrics used: Demographic Parity (DP, Dwork et al. 2012):
+  M_DP = |P(Yhat=1|A=-1) - P(Yhat=1|A=1)|.
+  Equalized Odds (EO, Hardt, Price, Srebro 2016):
+  M_EO = max_{y in {0,1}} |P(Yhat=1|A=-1,Y=y) - P(Yhat=1|A=1,Y=y)|.
+- These are generalized via "composite linear disparity": for classifier
+  h(x,a), M_phi(h) = max_{k=1..K} |D_k(h)|, where
+  D_k(h) = sum_{a in A} E_{X~P^a_X}[phi^a_k(eta(X,a)) h(X,a)].
+  Example 1 gives: K=1, phi^a_1 = a -> recovers DP. K=2 with
+  phi^a_1(w) = a*w / P(Y=1|A=a), phi^a_2(w) = a(1-w) / P(Y=0|A=a) -> recovers
+  EO. (This composite form also covers Equality of Opportunity and
+  Predictive Equality per the text, though those are not separately
+  evaluated in experiments.)
+- Local vs global fairness formalized (Definition 1, page 22473-22474):
+  Local fairness M^l,c_psi(h) = max over k_l of |D^l,c_{k_l}(h)|, where
+  D^l,c_{k_l}(h) = sum_{a in A} E_{X~P^a_{X,c}}[psi^{a,c}_{k_l}(eta(X,a,c))
+  h(X,a,c)] (evaluated on client c's local conditional distribution
+  P(X,A,Y|C)).
+  Global fairness M^g_phi(h) = max over k_g of |D^g_{k_g}(h)|, where
+  D^g_{k_g}(h) = sum_{a in A} sum_{c in C} E_{X~P^a_{X,c}}
+  [phi^{a,c}_{k_g}(eta(X,a,c)) h(X,a,c)] (evaluated on the global/pooled
+  distribution P(X,A,Y)).
+  {psi^{a,c}_{k_l}} and {phi^{a,c}_{k_g}} are linear functions depending on a
+  and c; K^{l,c} and K^g are the number of local/global linear disparities
+  needed to characterize the fairness criterion.
+
+Assumption 1 (eta-continuity, page 22474): for each client c, the mapping
+t -> P(eta(X,A,C) <= t | A=a, C=c) is almost surely continuous restricted to
+[0,1] — i.e. the conditional-probability function has no atoms. The paper
+states this is "of little or no concern in practice" and can be satisfied by
+adding slight random noise to any estimator.
+
+Optimization problem (Eq. 2, page 22474):
+  min_{h in H} R(h)
+  s.t. |D^{l,c}_{k_l}(h)| <= delta_{l,c}, for all c in [C], k_l in [K^{l,c}]
+       |D^g_{k_g}(h)| <= delta_g, for all k_g in [K^g]
+The solution is called the "Bayes optimal federated fair classifier" —
+theoretically achieves the optimal accuracy/global-fairness/local-fairness
+trade-off.
+
+THEOREM 1 (Bayes optimal federated fair classifier, page 22474, "Theorem 1"):
+Under Assumption 1, for p_{a,c} := P(A=a, C=c), phi^{a,c} := [phi^{a,c}_{k_g}]
+for k_g=1..K^g, and psi^{a,c} := [psi^{a,c}_{k_l}] for k_l=1..K^{l,c}, h* is
+the Bayes optimal federated fair classifier solving Problem (2) if:
+
+  h*(x,a,c) = I[F(lambda*, mu*, x, a, c) >= 0]                        (no eq#
+                                                                        given
+                                                                        beyond
+                                                                        stmt)
+
+  F(lambda*, mu*, x, a, c)
+    = p_{a,c} * (2*eta(x,a,c) - 1)
+      - (lambda*_1 - lambda*_2)^T * phi^{a,c}(eta(x,a,c))
+      - (mu*_{1,c} - mu*_{2,c})^T * psi^{a,c}(eta(x,a,c))                (3)
+
+where (lambda*, mu*), with lambda = (lambda_1, lambda_2) in R^{2*K^g},
+mu_c = (mu_{1,c}, mu_{2,c}) in R^{2*K^{l,c}}, mu = [mu_c]_{c in C}, and
+lambda, mu >= 0, are the optimal "Lagrangian-style" dual parameters
+determined by the convex minimization problem:
+
+  (lambda*, mu*) in argmin_{lambda, mu >= 0} H(lambda, mu)               (no
+                                                                        explicit
+                                                                        eq# in
+                                                                        extracted
+                                                                        text,
+                                                                        appears
+                                                                        directly
+                                                                        before
+                                                                        Eq. 4)
+
+  H(lambda, mu) = sum_{c in C} sum_{a in A} E_{X~P^a_{X,c}}
+                    [ (F(lambda, mu, X, a, c))_+ ]
+                  + delta_g * (lambda_1 + lambda_2)^T * 1_{K^g}
+                  + sum_{c in C} delta_{l,c} * (mu_{1,c} + mu_{2,c})^T *
+                    1_{K^{l,c}}                                          (4)
+
+The theorem states: optimality of lambda* provides the global fairness
+guarantee, and optimality of mu*_c provides the local fairness guarantee for
+client c. (Full proof is in Appendix B, NOT in this PDF.)
+
+Remark given in text: Theorem 1 degenerates to the local-only or global-only
+case simply by dropping the unneeded constraint set from Problem (2) — this
+is how the paper derives the LoGoFair_l (local-only) and LoGoFair_g
+(global-only) ablation variants used in experiments.
+
+Empirical / plug-in estimator version (Eq. 5, page 22475): since the true
+eta is unknown, LoGoFair plugs in an estimated eta_hat(x,a,c) (from a
+pre-trained probabilistic classifier) and estimated p_hat_{a,c},
+phi_hat^{a,c}, psi_hat^{a,c}:
+
+  F_hat(lambda, mu, x, a, c)
+    = p_hat_{a,c} * (2*eta_hat(x,a,c) - 1)
+      - (lambda_1 - lambda_2)^T * phi_hat^{a,c}(eta_hat(x,a,c))
+      - (mu_{1,c} - mu_{2,c})^T * psi_hat^{a,c}(eta_hat(x,a,c))          (5)
+
+Bi-level reformulation (Eq. 6, page 22475): the min_{lambda,mu>=0} H(lambda,
+mu) problem is restructured as a bi-level problem so that mu_c can be solved
+per-client while only lambda needs federation:
+
+  min_{lambda >= 0} H_hat(lambda) = sum_{c in C} H_hat_c(lambda),
+     H_hat_c(lambda) := min_{mu_c >= 0} H_hat_c(lambda, mu_c)            (6)
+
+Per-client local fairness optimization task (Eq. 7, page 22475):
+
+  H_hat_c(lambda, mu_c)
+    = sum_{a in A} (1/N^a_{val,c}) * sum_{i=1}^{N^a_{val,c}}
+        r_beta( F_hat(lambda, mu, x^a_i,c, a, c) )                       (plus)
+      + delta_g/|C| * (lambda_1 + lambda_2)^T * 1_{K^g}
+      + delta_{l,c} * (mu_{1,c} + mu_{2,c})^T * 1_{K^{l,c}}              (7)
+
+Where the hinge/ReLU-style term (.)_+ = max(., 0) in Eq. (7)'s underlying
+formulation is replaced by a SMOOTHED HINGE (the "logarithmic exponential
+relaxation") to make the objective smooth enough for gradient-based
+federated optimization (the paper explicitly says raw subgradient descent in
+the federated setting "is usually ineffective owing to the intrinsic slow
+convergence", citing Yuan, Zaheer, Reddi 2021 on federated composite
+optimization). The smoothed hinge is defined (page 22475):
+
+  r_beta(x) = (1/beta) * log(1 + exp(beta*x))
+
+As beta -> infinity, r_beta(x) reduces to max(x, 0). NO NUMERIC VALUE FOR
+BETA IS GIVEN ANYWHERE IN THE MAIN TEXT read here. (It may be specified in
+Appendix D.1, not present in this PDF — mark as NOT STATED IN AVAILABLE
+TEXT / not verifiable from this document.)
+
+Federated optimization procedure: "projection gradient descent is utilized
+to approach the optimal solution" for problem (6). The paper states: "We
+present the federated post-processing procedure in Algorithm 1 of Appendix
+C, along with its efficiency, privacy analysis, and additional discussion."
+ALGORITHM 1 ITSELF (the literal pseudocode: exact rounds of client-server
+communication, exact projected-gradient-descent update rule/step size for
+lambda, inner-loop steps for mu_c, exact stopping criterion) IS IN APPENDIX
+C, WHICH IS NOT PRESENT IN THIS PDF. What IS stated in the main body about
+the procedure, textually:
+  - lambda (global fairness guidance / dual variable) is optimized
+    federatively via projected gradient descent across clients, since raw
+    client data cannot leave clients and lambda cannot be optimized
+    "directly" by any single party.
+  - mu_c (local fairness dual variable) is solved purely locally per client
+    ("Clients can locally apply subgradient descent... or grid search... to
+    enforce local fairness") — i.e., mu_c is a per-client local optimization
+    problem, never transmitted/shared in raw form in the sense that it is
+    client-specific, local information used only to guarantee that client's
+    own local fairness.
+  - lambda is described as "global fairness guidance" shared/communicated
+    across all clients, and mu_c as the "client-specific parameter" that
+    "guarantees local fairness."
+  - Communication rounds are denoted T; Figure 3b (Sec 5.5) shows "rapid
+    convergence of the three metrics [Acc, M^local_DP, M^global_DP] to
+    stable values within 10 rounds across three datasets" — this is the
+    paper's explicit statement that communication/post-processing rounds
+    converge within ~10 rounds (matches the archive note's expectation of
+    "~10" post_rounds, and IS explicitly stated in the main text, not just
+    an appendix guess).
+
+Temperature calibration step: "For the purpose of further mitigating the
+estimation error in probability scores generated by the FL model, we adopt
+model calibration (Guo et al. 2017) to calibrate the learned FL classifier."
+(page 22475, Sec 4.3). Guo et al. 2017 "On calibration of modern neural
+networks" (ICML) is the canonical temperature-scaling calibration paper —
+the paper cites it by name but does NOT give its own temperature-scaling
+formula, temperature value, or implementation details; it only says it
+"adopts" that calibration technique as a pre-step before post-processing.
+This calibration happens on the already-trained probabilistic classifier,
+before/alongside estimating eta_hat, p_hat_{a,c}, phi_hat, psi_hat on the
+validation set.
+
+min_group_count / small-group safeguard: NOT STATED ANYWHERE IN THE MAIN
+TEXT read in this PDF. No explicit "minimum group count" safeguard,
+threshold, or fallback-behavior-for-small-groups is mentioned in the 9 pages
+available. If this exists, it is implementation detail in Appendix C/D
+(not present here) — do not assume a value; treat as an unverified
+engineering addition if the codebase implements one.
+
+Validation-set usage (page 22475, Sec 4.3): "we propose to calibrate
+fairness via post-processing in a validation dataset D^val = union_{c in C}
+D^val_c." Denoting validation data of sensitive group a in client c as
+D^val_{a,c} = {x^a_i,c}_{i=1}^{N_{a,c}}, the empirical estimates of F (Eq. 3)
+are computed via Eq. (5)/(7) on this validation data. Per Evaluation
+Protocols (Sec 5.1, page 22475-22476): "Firstly, we partition each dataset
+into a 70% training set and the remaining 30% for test set, while
+post-processing models use half of training set as validation set following
+previous post-processing works (Xian, Yin, and Zhao 2023; Chen, Klochkov,
+and Liu 2024)." So: 70% train / 30% test split overall; of the 70% training
+portion, HALF is further carved out as the validation set used for the
+post-processing/calibration step (i.e., effectively ~35% of the full dataset
+functions as calibration/validation data, ~35% as the portion used to
+pretrain/fit the base probabilistic classifier, ~30% held out as test).
+
+4. EXPERIMENTS
+---------------
+Datasets (Sec 5.1, page 22475-22476, Table 1 header, page 22475):
+The paper states explicitly: "We consider three real-world benchmarks,
+Adult (Asuncion, Newman et al. 2007), ENEM (INEP 2018), and CelebA (Zhang
+et al. 2020), which are well-established for assessing fairness issues in
+FL (Ezzeldin et al. 2023; Chang and Shokri 2023; Duan et al. 2024)."
+
+  - Adult: UCI Adult / Census Income dataset (Asuncion & Newman, UCI Machine
+    Learning Repository, 2007). This is the standard UCI Adult Income
+    dataset. The paper does not re-state in the main text which column is
+    the sensitive attribute or which is the label for Adult (this level of
+    per-dataset preprocessing/attribute detail is deferred to "Appendix
+    D.1: detailed information in this section is provided in Appendix D.1"
+    — NOT present in this PDF). By field convention (and because the paper
+    treats A as binary throughout, A in {-1,1}) Adult's canonical setup
+    is gender as sensitive attribute and income >$50K as binary label, but
+    THE PAPER ITSELF DOES NOT STATE THIS EXPLICITLY IN THE TEXT MADE
+    AVAILABLE HERE — flagging explicitly rather than asserting it as
+    paper-confirmed.
+  - ENEM: Brazilian national high school exam dataset (INEP — Instituto
+    Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira, 2018,
+    "Boletim de Serviço Eletrônico"). Again, exact sensitive-attribute/label
+    definition is not restated in the main body text available; deferred to
+    Appendix D.1.
+  - CelebA: the paper cites "Zhang, Y.; Yin, Z.; Li, Y.; Yin, G.; Yan, J.;
+    Shao, J.; and Liu, Z. 2020. Celeba-spoof: Large-scale face anti-spoofing
+    dataset with rich annotations." — NOTE: this citation is for
+    "CelebA-Spoof", a face anti-spoofing variant/extension of CelebA, not
+    plain facial-attribute CelebA. The main text only ever refers to this
+    dataset as "CelebA" in Table 1 and prose; it is an IMAGE dataset (faces)
+    used with demographic-style sensitive attributes (gender is the typical
+    sensitive attribute used in CelebA-fairness literature, consistent with
+    Ezzeldin et al. 2023 / FairFed's use of CelebA), but the paper's main
+    text does not restate exactly which attribute is sensitive or which
+    attribute is the classification label for CelebA here either — deferred
+    to Appendix D.1, not present.
+
+  EXPLICIT ANSWER TO THE CIFAR10 QUESTION: CIFAR10 IS NOT MENTIONED ANYWHERE
+  IN THIS PAPER. The only three datasets used in any experiment, anywhere in
+  the 9 pages (abstract, body, tables, conclusion) are Adult, ENEM, and
+  CelebA. Two of the three (Adult, ENEM) are classic TABULAR real-world
+  fairness benchmarks with real sensitive attributes and are standard
+  binary-classification datasets in the fair-ML literature. CelebA is the
+  one exception that is image data (faces), but even that is not a generic
+  natural-image multi-class dataset like CIFAR10 — it's a face dataset used
+  specifically for its demographic attribute annotations (e.g., gender),
+  which is exactly the kind of real protected attribute CIFAR10 structurally
+  lacks. The paper never performs or reports any experiment on CIFAR10,
+  CIFAR100, MNIST, ImageNet, or any generic object-classification image
+  benchmark. All three reported datasets are used for BINARY classification
+  with a real, meaningful sensitive/protected attribute (consistent with the
+  paper's formal setup: Y in {0,1}, A in {-1,1}).
+
+Model / architecture: The main text does NOT state the base model
+architecture (e.g., logistic regression, MLP, CNN) used to produce the
+pre-trained probabilistic classifier eta_hat for any of the three datasets.
+Sec 5.1 explicitly says "Due to space limitations, the detailed information
+in this section is provided in Appendix D.1" (page 22475) — meaning
+architecture choice is NOT available in the text extracted from this PDF.
+The method is described as fundamentally "model-agnostic" (Sec 2.1, 4.1,
+4.3, Conclusion all reiterate this) — i.e., LoGoFair is presented as
+compatible with ANY underlying classifier/model architecture, and the paper
+does not commit to one architecture as a defining feature of the method.
+It does state the base FL training uses cross-entropy loss: "We can utilize
+a wide range of FL approaches to obtain precisely probabilistic classifier
+trained using the cross-entropy loss (McMahan et al. 2017; Tan et al.
+2022)" (page 22475) — citing FedAvg (McMahan et al. 2017) by name as an
+example base trainer. FedAvg itself is also used as a literal baseline row
+in Table 1 (undisguised "FedAvg" without any fairness post-processing). The
+claim in the user's archive note that a reproduction config used
+model kind "logistic" for Adult CANNOT BE VERIFIED OR REFUTED from this PDF
+— the paper's main text does not state the architecture; logistic regression
+is a very plausible/common choice for tabular Adult/ENEM baselines in this
+literature, but it is not written in the text available here, so it must be
+attributed to the archive config's own prior assumption, not to the paper.
+
+Number of clients: "The number of participating clients is set to 5 to
+simulate the FL environment" (Sec 5.1, Evaluation Protocols, item 3, page
+22476) — this is the default/main setting used for Table 1 and Table 2.
+Separately, Sec 5.4 (Scalability, RQ3) sweeps client count from "2 to 50
+clients on all three datasets using heterogeneity level alpha=0.5" (page
+22476), with Figure 3a showing results at client counts {2, 5, 10, 15, 20,
+50} (read off the x-axis labels in the extracted Figure 3a text, page
+22476).
+
+Heterogeneity control: heterogeneity of the sensitive-attribute distribution
+across clients is controlled via a Dirichlet distribution Dir(alpha)
+(following Ezzeldin et al. 2023), producing a dominant sensitive group per
+client; SMALLER alpha = MORE heterogeneity. Table 1 and the main
+comparison experiments sweep alpha in {0.5, 5, 100} (these are exactly the
+three alpha blocks shown in Table 1, page 22475-22476, and match the
+Figure 1a/1b toy-example x-axis values {0.5, 5, 100} on page 22471). Table 2
+(sensitivity analysis) and Figure 3a (client scalability) both fix
+alpha = 0.5.
+
+Mode comparisons (local-only / global-only / local+global): the paper
+defines three LoGoFair variants, all derived from the same Theorem 1 by
+dropping constraints per the Remark after Theorem 1:
+  - LoGoFair_g: global-fairness-only (drops local constraints)
+  - LoGoFair_l: local-fairness-only (drops global constraints)
+  - LoGoFair_{l&g}: both local AND global fairness simultaneously (the full
+    method)
+These three rows appear for every (dataset, alpha) combination in Table 1.
+Ablation-study takeaway quoted (page 22476): "with a single fairness
+constraint, these methods [LoGoFair_l, LoGoFair_g] typically perform better
+in the targeted fairness notion compared to LoGoFair_{l&g}... For local
+fairness, LoGoFair_l implement[s] fairer federated model in local level
+with best accuracy in most cases compared to other methods. Similarly,
+LoGoFair_g also outperforms all other methods in balancing accuracy and
+global fairness... LoGoFair_{l&g} generally provides both local and global
+fairness guarantee at the cost of slight accuracy degradation compared to
+LoGoFair_l and LoGoFair_g."
+
+Fairness slack values (delta_l, delta_g):
+  - Table 1 (main comparison): "Here we set delta_{l,c} = delta_g = 0.01"
+    (page 22476, Sec 5.2) for ALL clients and the global constraint, used
+    uniformly across all three alpha values {0.5, 5, 100} and all three
+    datasets in Table 1.
+  - Table 2 (sensitivity analysis, Sec 5.3, page 22477): delta_l and delta_g
+    are swept over a 3x3 grid of (delta_l, delta_g) pairs:
+    (0.00,0.00), (0.02,0.00), (0.04,0.00),
+    (0.00,0.02), (0.02,0.02), (0.04,0.02),
+    (0.00,0.04), (0.02,0.04), (0.04,0.04)
+    — i.e. delta_l and delta_g each independently take values in
+    {0.00, 0.02, 0.04}, fixed at alpha=0.5. The text states: "we also set
+    the local fairness relaxation delta_{l,c} for each client to the same
+    value, denoted as delta_l" (page 22477) — confirming delta_l is shared
+    uniformly across clients in this sweep too.
+
+Beta (smoothing) value: NOT STATED numerically anywhere in the main text
+made available in this PDF. Only the functional form r_beta(x) =
+(1/beta)*log(1+exp(beta*x)) and its limiting behavior (beta->infinity gives
+max(x,0)) are given (page 22475). No numeric beta is quoted in the
+experiments section text extracted here.
+
+post_rounds / convergence rounds: Sec 5.5 (Effectiveness Analysis, RQ4,
+page 22477) states: "The behavior of LoGoFair is monitored for different
+values of communication rounds T, leading to the results shown in Figure
+3b. The rapid convergence of the three metrics to stable values within 10
+rounds across three datasets empirically confirms the effectiveness." This
+is the ONLY explicit statement on round count: convergence is reported
+WITHIN 10 communication rounds (matches the archive note's "~10" post_rounds
+assumption and is explicitly stated in the paper, not inferred). Figure 3b's
+x-axis is read as spanning 0 to roughly 10 in the extracted text (page
+22477: "0 10 / 0 10 / 0 10" under Adult / ENEM / CelebA) — consistent with
+a sweep from 0 up to 10 rounds.
+
+lr / inner_lr / inner_steps: NOT STATED ANYWHERE IN THE MAIN TEXT AVAILABLE
+in this PDF. The optimization procedure (projected gradient descent for
+lambda at the federation level; local subgradient descent or grid search for
+mu_c at the client level) is described only qualitatively — no learning
+rate, no inner-loop step count, no outer-loop step count is given in the 9
+pages read. These would be in Algorithm 1 (Appendix C), which is absent
+from this PDF.
+
+RESULT TABLES — quoted content:
+
+Table 1 (page 22475-22476), "Comparison experimental result", DP criterion
+(M_DP) only — paper states "All the results of EO criterion (M_EO) are
+reported in Appendix D.3" (NOT present in this PDF, so EO numbers are
+UNAVAILABLE here). Columns per dataset: Acc (up-arrow, higher better),
+M^local_DP (down-arrow, lower better), M^global_DP (down-arrow, lower
+better). Three dataset blocks (Adult, ENEM, CelebA) x three alpha blocks
+(0.5, 5, 100) x methods {FedAvg, FedFB, FairFed, FCFL, LoGoFair_g,
+LoGoFair_l, LoGoFair_{l&g}}. Footnotes to Table 1: "* The bold text indicates
+the result of LoGoFair. The best results are marked with *. The
+second-best results are underlined." / "* All outcomes pass the significance
+test, with a p-value below the significance threshold of 0.05." / "* We use
+FedAvg as the baseline for optimal accuracy, without comparing it in terms
+of the accuracy-fairness trade-off."
+
+Full Table 1 values as extracted (Acc / M^local_DP / M^global_DP), by
+alpha block:
+
+alpha = 0.5:
+  Adult:   FedAvg    0.8381 / 0.1922 / 0.1759
+           FedFB     0.8158 / 0.1174 / 0.0767
+           FairFed   0.8079 / 0.1416 / 0.0956
+           FCFL      0.8167 / 0.0832 / 0.1479
+           LoGoFair_g  0.8218 / 0.0889 / 0.0183*
+           LoGoFair_l  0.8252* / 0.0367* / 0.0468
+           LoGoFair_{l&g} 0.8214 / 0.0489 / 0.0204
+  ENEM:    FedAvg    0.7266 / 0.2030 / 0.1953
+           FedFB     0.7089 / 0.1625 / 0.0801
+           FairFed   0.6974 / 0.1721 / 0.1002
+           FCFL      0.6997 / 0.0900 / 0.1837
+           LoGoFair_g  0.7111 / 0.0574 / 0.0141*
+           LoGoFair_l  0.7129* / 0.0241* / 0.0473
+           LoGoFair_{l&g} 0.7109 / 0.0281 / 0.0151
+  CelebA:  FedAvg    0.8934 / 0.1308 / 0.1441
+           FedFB     0.8705 / 0.1064 / 0.0723
+           FairFed   0.8555 / 0.1163 / 0.0975
+           FCFL      0.8391 / 0.0827 / 0.1373
+           LoGoFair_g  0.8698 / 0.0581 / 0.0154*
+           LoGoFair_l  0.8734* / 0.0196* / 0.0515
+           LoGoFair_{l&g} 0.8710 / 0.0312 / 0.0295
+
+alpha = 5:
+  Adult:   FedAvg    0.8418 / 0.1820 / 0.1725
+           FedFB     0.8243 / 0.1134 / 0.0658
+           FairFed   0.8157 / 0.1264 / 0.0971
+           FCFL      0.8134 / 0.0673 / 0.1297
+           LoGoFair_g  0.8264* / 0.0399 / 0.0104*
+           LoGoFair_l  0.8237 / 0.0252* / 0.0215
+           LoGoFair_{l&g} 0.8244 / 0.0259 / 0.0138
+  ENEM:    FedAvg    0.7268 / 0.1894 / 0.1814
+           FedFB     0.7116* / 0.1502 / 0.0807
+           FairFed   0.7067 / 0.1600 / 0.1173
+           FCFL      0.7031 / 0.0623 / 0.1073
+           LoGoFair_g  0.7107 / 0.0548 / 0.0112*
+           LoGoFair_l  0.7065 / 0.0133* / 0.0423
+           LoGoFair_{l&g} 0.7049 / 0.0209 / 0.0142
+  CelebA:  FedAvg    0.8962 / 0.1394 / 0.1461
+           FedFB     0.8677 / 0.0856 / 0.0532
+           FairFed   0.8516 / 0.1045 / 0.0874
+           FCFL      0.8699 / 0.0585 / 0.0941
+           LoGoFair_g  0.8721 / 0.0484 / 0.0192*
+           LoGoFair_l  0.8730* / 0.0267* / 0.0475
+           LoGoFair_{l&g} 0.8704 / 0.0279 / 0.0242
+
+alpha = 100:
+  Adult:   FedAvg    0.8466 / 0.1802 / 0.1759
+           FedFB     0.8197 / 0.0901 / 0.0790
+           FairFed   0.8267 / 0.0977 / 0.1086
+           FCFL      0.8194 / 0.0613 / 0.0897
+           LoGoFair_g  0.8297* / 0.0368 / 0.0282*
+           LoGoFair_l  0.8288 / 0.0335* / 0.0379
+           LoGoFair_{l&g} 0.8283 / 0.0362 / 0.0297
+  ENEM:    FedAvg    0.7279 / 0.1852 / 0.1746
+           FedFB     0.7047 / 0.0821 / 0.0698
+           FairFed   0.7072 / 0.1027 / 0.0962
+           FCFL      0.7014 / 0.0633 / 0.0871
+           LoGoFair_g  0.7118* / 0.0228 / 0.0114*
+           LoGoFair_l  0.7107 / 0.0189* / 0.0209
+           LoGoFair_{l&g} 0.7061 / 0.0193 / 0.0119
+  CelebA:  FedAvg    0.8997 / 0.1352 / 0.1467
+           FedFB     0.8715 / 0.0736 / 0.0698
+           FairFed   0.8617 / 0.0950 / 0.0862
+           FCFL      0.8659 / 0.0587 / 0.0673
+           LoGoFair_g  0.8724* / 0.0265 / 0.0182*
+           LoGoFair_l  0.8708 / 0.0175* / 0.0213
+           LoGoFair_{l&g} 0.8712 / 0.0211 / 0.0295
+
+(Asterisks "*" on individual cells denote best-in-column per the table's own
+footnote convention; transcribed exactly as printed.)
+
+Table 2 (page 22477), "Accuracy-Fairness Trade-off (Sensitivity Analysis)",
+fixed at alpha=0.5, DP criterion, varying (delta_l, delta_g):
+
+  (delta_l, delta_g)  Adult: Acc/M^local_DP/M^global_DP | ENEM: same | CelebA: same
+  (0.00,0.00): Adult 0.8186/0.0439/0.0035 | ENEM 0.7087/0.0187/0.0005 | CelebA 0.8607/0.0089/0.0015
+  (0.02,0.00): Adult 0.8209/0.0488/0.0040 | ENEM 0.7093/0.0243/0.0009 | CelebA 0.8688/0.0243/0.0039
+  (0.04,0.00): Adult 0.8209/0.0543/0.0062 | ENEM 0.7104/0.0459/0.0012 | CelebA 0.8701/0.0459/0.0052
+  (0.00,0.02): Adult 0.8235/0.0454/0.0339 | ENEM 0.7113/0.0192/0.0215 | CelebA 0.8713/0.0192/0.0215
+  (0.02,0.02): Adult 0.8255/0.0507/0.0366 | ENEM 0.7132/0.0261/0.0314 | CelebA 0.8732/0.0361/0.0314
+  (0.04,0.02): Adult 0.8243/0.0634/0.0400 | ENEM 0.7140/0.0492/0.0367 | CelebA 0.8740/0.0462/0.0367
+  (0.00,0.04): Adult 0.8238/0.0423/0.0352 | ENEM 0.7115/0.0220/0.0238 | CelebA 0.8715/0.0242/0.0438
+  (0.02,0.04): Adult 0.8252/0.0548/0.0448 | ENEM 0.7136/0.0332/0.0379 | CelebA 0.8736/0.0432/0.0479
+  (0.04,0.04): Adult 0.8265/0.0667/0.0516 | ENEM 0.7157/0.0540/0.0515 | CelebA 0.8757/0.0604/0.0505
+
+Sensitivity-analysis takeaway quoted (page 22477): "with a constant global
+constraint delta_g, an[sic] decreasing in delta_l results in lower Acc and
+local fairness [violation], indicating that while the model achieves
+superior local fairness, its overall performance declines. Similarly,
+holding delta_l constant allows the control of global fairness through
+adjustments in delta_g."
+
+Figure 3a (Sec 5.4, RQ3, Scalability, page 22476-22477): client counts swept
+{2, 5, 10, 15, 20, 50} on all three datasets at alpha=0.5, plotting Acc,
+M^local_DP, M^global_DP. Exact numeric values are only given graphically
+(not in a text table) — not transcribable as exact numbers from the
+extracted text, only the qualitative finding: "Local fairness metric in the
+Adult and CelebA datasets presents a minor increase with the growing number
+of clients. This trend can be attributed to the reduction in data samples
+available for local fairness evaluation, which exacerbates the estimation
+error of federated post-processing procedure. Other measures reveal[] slight
+fluctuations in accuracy and fairness metrics, underscoring the model's
+robustness to variations in client number."
+
+Figure 3b (Sec 5.5, RQ4, page 22477): communication-round sweep (described
+above, "within 10 rounds"), also only graphical, no exact numeric table
+given in text.
+
+Baselines compared (Sec 5.1, "Baselines", page 22476): "Since no previous
+work was found that endeavors to simultaneously achieve local and global
+fairness within a FL framework, we compare the performance of LoGoFair with
+FedAvg (McMahan et al. 2017) and three SOTA methods tailored for either
+global or local fairness, namely FairFed (Ezzeldin et al. 2023), FedFB
+(Zeng, Chen, and Lee 2021), FCFL (Cui et al. 2021)." So baselines = {FedAvg
+(unconstrained accuracy baseline, not fairness-adjusted), FairFed (global
+fairness), FedFB (global fairness), FCFL (local fairness)}.
+
+Significance testing: "All outcomes pass the significance test, with a
+p-value below the significance threshold of 0.05" (Table 1 footnote) — no
+further detail (which test, how many seeds/runs) is given in the available
+text.
+
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+-------------------------------------------
+- Model-agnosticism: repeatedly emphasized (Introduction contributions list,
+  Sec 4.1 Overview, Sec 4.3, Conclusion) as a design goal — LoGoFair is a
+  post-processing calibration layer applied AFTER any FL training algorithm
+  produces a probabilistic classifier, so it can "be conveniently adopted to
+  mitigate bias in a wide range of existing FL algorithms" (page 22473).
+  This supports implementing it as a strategy/wrapper rather than a
+  from-scratch training algorithm in a codebase.
+- Base FL trainer example given by the paper itself: FedAvg (McMahan et al.
+  2017), trained with cross-entropy loss, also cited as an example together
+  with Tan et al. 2022 ("Towards personalized federated learning") as
+  possible personalized-FL alternatives for producing the base probabilistic
+  classifier.
+- Calibration (Guo et al. 2017, temperature-scaling-style model calibration)
+  is applied to the pretrained FL classifier specifically "to further
+  mitigate the estimation error in probability scores" before the
+  fairness-calibration post-processing step — i.e., there are conceptually
+  TWO calibration-like steps: (1) general probability calibration (Guo et
+  al. 2017 style, e.g. temperature scaling) to make eta_hat well-calibrated,
+  then (2) the fairness-specific lambda/mu post-processing calibration
+  (Theorem 1 procedure) on top of that calibrated eta_hat.
+- Communication/privacy properties: Sec 4.3 states raw client data "is
+  stored on the client side and must remain confidential", so lambda cannot
+  be optimized with direct access to any client's raw data — only
+  gradient-style/federated information is exchanged for lambda, while mu_c
+  (the local-fairness dual variable) is kept and solved ENTIRELY LOCALLY per
+  client and is explicitly local, client-specific information. The paper
+  promises "efficiency, privacy analysis, and additional discussion" of this
+  in Appendix C (not available in this PDF) — so exact message sizes,
+  number of communication rounds' worth of payload, or formal privacy
+  guarantees (e.g. differential privacy bounds) are NOT stated in the
+  available text; only the qualitative claim that lambda-only communication
+  (not raw mu_c or raw data) is federated.
+- Convex optimization structure: H(lambda) and H_c(lambda, mu_c) are stated
+  to be convex (but not smooth) in lambda and mu_c respectively (page
+  22475) — the smoothed hinge r_beta is specifically introduced to make the
+  per-client objective smooth enough for effective gradient-based federated
+  optimization (motivated by citing Yuan, Zaheer, Reddi 2021 on the slow
+  convergence of federated composite/subgradient optimization).
+- Research questions driving the experiment section (Sec 5, page 22475):
+  RQ1 (does LoGoFair beat existing methods on the accuracy/fairness
+  balance), RQ2 (can LoGoFair adjust the accuracy vs local/global fairness
+  trade-off via delta_l/delta_g — sensitivity analysis), RQ3 (how does
+  client count affect LoGoFair performance — scalability), RQ4 (what is
+  LoGoFair's communication efficiency).
+
+SUMMARY ANSWER FOR DOWNSTREAM CONFIG-BUILDING (explicit, non-ambiguous):
+This paper's empirical section is STRICTLY TABULAR/TEXT-FEATURE
+binary-classification fairness benchmarks (Adult, ENEM) plus one face-image
+dataset used for its demographic annotation (CelebA / CelebA-Spoof). There
+is NO CIFAR10 experiment, no generic image-classification benchmark, and no
+multi-class (non-binary) label setting anywhere in this paper. All three
+datasets have Y in {0,1} and A in {-1,1} per the paper's own formal setup.
+Consequently, any CIFAR10-based reproduction in this codebase (with a
+synthetic vehicle-vs-animal proxy sensitive attribute and a binarized
+class-0-vs-rest label) is NOT something the paper itself ever tests or
+validates — it is a necessary substitution made because CIFAR10 has no real
+protected attribute or native binary label, and this divergence from the
+paper's actual experimental domain (tabular/face fairness benchmarks with
+real sensitive attributes) should be documented explicitly as a limitation
+in any thesis write-up, not presented as paper-faithful reproduction of
+LoGoFair's own benchmark setting.

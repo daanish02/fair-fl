@@ -1,0 +1,717 @@
+===============================================================================
+1. CITATION
+===============================================================================
+
+Andrea Augello, Ashish Gupta, Giuseppe Lo Re (Senior Member, IEEE), Sajal K.
+Das (Fellow, IEEE).
+"FairRFL: Fair and Robust Federated Learning in the Presence of Selfish
+Clients."
+IEEE Transactions on Emerging Topics in Computing (TETC), Vol. 14, No. 1,
+January-March 2026, pp. 316-331.
+DOI: 10.1109/TETC.2026.3661199
+Received 26 May 2025; revised 26 December 2025; accepted 29 January 2026.
+Date of publication 11 February 2026; date of current version 11 March 2026.
+Open access (CC BY 4.0).
+
+Note: This is an extension of an earlier conference paper:
+A. Augello, A. Gupta, G. Lo Re, S. K. Das, "Tackling selfish clients in
+federated learning," in Proc. 27th Eur. Conf. Artif. Intell. (ECAI), 2024,
+pp. 1888-1895. [Ref 13]
+
+Source code stated as publicly available at:
+https://github.com/ndslab-group/FairRFL
+
+===============================================================================
+2. PROBLEM SETUP
+===============================================================================
+
+The paper introduces and formalizes a new category of misbehaving FL client
+called a "selfish" client. Unlike malicious/Byzantine clients, a selfish
+client has no intent to degrade the global model or disrupt convergence;
+instead, under non-IID data, it crafts/upscales its uploaded update so that
+the AGGREGATED GLOBAL MODEL ends up closer to minimizing ITS OWN local loss
+F_s(w) rather than the true population-average objective. This benefits the
+selfish client's own accuracy but, as an unintended side effect, degrades
+generalization and accuracy for other (normal) clients and sharply increases
+the variance of per-client accuracy (an accuracy-parity/fairness definition,
+Definition 1: model w is "fairer" than w' iff var({F_i(w)}) < var({F_i(w')})
+across clients). Because the selfish client's update still contains genuinely
+useful information (it is not poisoned/garbage), simply detecting and
+discarding it (as done for malicious/Byzantine clients) is suboptimal — doing
+so throws away real signal and hurts generalization for clients whose data
+resembles the selfish client's distribution. The paper's goal is therefore
+two-fold: (1) robustly detect and RECOVER an estimate of the selfish client's
+true (un-crafted) update rather than discard it (RFL-Self), and (2) improve
+fairness (reduce cross-client accuracy variance) via a dynamic fairness
+weighting mechanism (Dq-FFL), combined as "FairRFL."
+
+===============================================================================
+3. ALGORITHM
+===============================================================================
+
+--- Notation (Table I) ---
+w^t          : global model at round t
+w*           : optimal global model
+F(.)         : global loss function
+F_i(.)       : local loss function of client i
+Gamma        : normalization factor for aggregation
+omega_i      : aggregation weight of client i
+delta_i      : local update of client i
+delta_[k]^t  : aggregated local updates at round t
+delta_[k]\{s}: aggregated local updates of all clients except s
+delta-bar_[k]\{s}: estimate of the average local update of all clients except s
+delta_s      : crafted update of selfish client s
+phi          : selfishness parameter
+N_med        : median norm of the local updates
+S            : set of suspected selfish clients
+delta_med    : median local update
+delta_i'     : recovered update of the i-th client
+
+--- Base FL optimization (Eq. 1) ---
+w* = argmin_w { F(w) := (1/k) sum_{i in [k]} F_i(w) }
+w^{t+1} = w^t + delta_[k]^t,  delta_[k]^t = (1/Gamma) sum_{i in [k]} omega_i delta_i^t
+FedAvg: Gamma = k (number of clients with equal-sized datasets), omega_i = 1
+(number-of-samples weighting also mentioned in general FedAvg description).
+q-FFL: Gamma computed dynamically by server from client losses; each client
+has its own aggregation weight omega.
+
+--- Selfish client's crafted-update optimization problem (Eq. 2) ---
+w_s* = argmin_w { F_s( (w + sum_{i in [k]\s} w_i) / Gamma ) }
+i.e. the selfish client s wants the AGGREGATED global model to minimize its
+own local loss F_s.
+
+--- Selfish update crafting objective (Eq. 3) ---
+delta-hat_s = argmin_{delta-hat_s} || w^t + (delta-hat_s + delta_[k]\{s}) / Gamma
+                                      - (w^t + delta_s) ||^2
+This requires knowledge of Gamma and delta_[k]\{s} (sum of other clients'
+updates), which the selfish client does NOT have (privacy). The selfish
+client instead estimates delta-bar_[k]\{s} (average update of others) by
+assuming it changes little between two consecutive rounds, using (unlabeled
+equation, appears after Eq.3, before Eq.4):
+argmin_{Gamma, delta-bar_[k]\{s}} || Gamma . (delta_[k]^{t-2} - delta-bar_[k]\{s}) - delta_s^{t-2} ||
+  + || Gamma . (delta_[k]^{t-1} - delta-bar_[k]\{s}) - delta_s^{t-1} ||
+(for t=2; initialized delta-bar_[k]\{s}^0 = delta_[k]^0, delta-bar_[k]\{s}^1 = delta_[k]^1)
+
+--- Full-replacement crafted update (Eq. 4) ---
+delta-hat_s = (Gamma/omega_s) delta_s - (Gamma - omega_s) delta-bar_[k]\{s}
+(This is the phi=1 / model-replacement-attack-style extreme.)
+
+--- Selfishness parameter phi and tunable crafted update (Eq. 5) ---
+phi in [0,1] controls what proportion of the global update is substituted
+with the selfish client's own update per round:
+delta-hat_s = phi ( (Gamma/omega_s) delta_s - (Gamma - omega_s) delta-bar_[k]\{s} )
+                + (1 - phi) omega_s delta-bar_[k]\{s}
+            = phi Gamma ( delta_s/omega_s - delta-bar_[k]\{s} ) + omega_s delta-bar_[k]\{s}
+phi=0 -> selfish client behaves like a normal client (contributes the
+average/estimated update of others). phi=1 -> full model-replacement attack
+(delta-hat_s = delta_s, entirely selfish). For FedAvg specifically
+(Gamma=k, omega=1): at phi = 1/k, delta-hat_s|_{phi=1/k} = delta_s.
+
+--------------------------------------------------------------------------
+ALGORITHM 1: Selfish Client Detection (RFL-Self detection step, server-side)
+--------------------------------------------------------------------------
+Input: set of k update vectors {delta_1,...,delta_k}, a threshold tau
+Output: set S of potentially selfish clients
+
+1. Compute N <- { ||delta_i||, for all i in [k] }           (set of L2 norms)
+2. Compute median norm: N_med <- median(N)
+3. MAD <- 1.4826 * median({ |N_i - N_med| , for all i in [k] })
+4. S <- {}
+5. for each i in [k]:
+6.     if (N_i - N_med) / MAD > tau:
+7.         S <- S union {i}
+8. return S
+
+- The 1.4826 constant makes MAD a consistent estimator of the standard
+  deviation for normal distributions.
+- tau is a user-specified sensitivity threshold. Paper sets tau = 2.5 after
+  testing values in range [0,6] (used as the heuristic default/"good
+  compromise" throughout the main experiments).
+- Complexity: O(dk + k log k), k = number of clients, d = model
+  dimensionality.
+- Theorem 1 proves: an effective selfish update always has LARGER L2 norm
+  than true/normal updates (necessary but not sufficient condition — Remark 4
+  notes flagging purely by norm > N_med would cause excessive false
+  positives, which is why MAD-based outlier detection is used instead of a
+  raw norm cutoff).
+- Theorem 1 derivation: by tuning phi such that ||delta-hat_s||^2 = ||Vert*
+  delta_s||^2 (i.e. the crafted update's norm equals some scaled true-update
+  norm), solving the resulting quadratic in phi (Eq. 6, Eq. 7) gives two
+  roots:
+    Eq.6: phi = ( ||omega_s delta-bar_[k]\{s}||^2 - ||delta_s||^2 ) /
+                ( (Gamma^2/omega_s^2)(||delta_s||^2 + 2<delta_s, delta-bar_[k]\{s}>)
+                  + ||omega_s delta-bar_[k]\{s}||^2 )
+    Eq.7: phi = omega_s / Gamma
+  Eq.7 (phi = omega_s/Gamma) is the trivial case where delta-hat_s coincides
+  exactly with the true update delta_s (no selfishness effect) — i.e. the
+  ONLY way to achieve actual selfish behavior is to send an update with a
+  LARGER norm than the true one.
+
+--------------------------------------------------------------------------
+RFL-Self recovery step: convex-combination / beta root-finding (server-side)
+--------------------------------------------------------------------------
+For each client s flagged in S, the server computes a recovered update
+delta_s' by convexly combining the flagged (crafted) update delta-hat_s with
+the marginal median update delta_med:
+
+Eq. 8:  delta_s' = beta * delta-hat_s + (1 - beta) * delta_med
+
+beta is chosen so the NORM of the recovered update delta_s' matches the
+median norm N_med of all received updates. This requires solving:
+
+Eq. 9:  || beta * delta-hat_s + (1 - beta) * delta_med || = N_med
+
+This is a QUADRATIC EQUATION in beta. One of its two roots is the trivial
+solution beta = 0; the other is solved analytically via the cosine rule
+using only the magnitude of the selfish update delta-hat_s and its dot
+product with the median update delta_med. Complexity of solving Eq. 9 is
+O(d) per suspected client (d = model dimensionality).
+
+Theoretical optimal beta (Eq. 12, derived under 3 idealized conditions, see
+Theorem-2 section below): beta ~= 1/(phi*Gamma) when all three recovery
+conditions hold (this makes delta_s' closely approximate the true delta_s).
+
+Worked numeric examples in the paper (toy 2D, illustrative only, NOT a real
+experiment config):
+- Example 4: 4 honest clients with norms N_1=1.1, N_2=0.9, N_3=0.8, N_4=1.2;
+  selfish client's update has norm N_s=2.02 (phi=0.5). Median norm
+  N_med=1.1, MAD=1.4826*median({0.28,0.18,0.10,0.10,0.92})=0.26. Detection
+  threshold = 1.1 + 2.5*0.26 = 1.75, exceeded only by the selfish client's
+  update (2.02) -> correctly flagged.
+- Example 5 (continuing Example 4): delta_med=[-0.20,0.55]. Solving Eq.9
+  gives beta=0.45, recovered delta_s'=[0.52,0.96]. (Paper notes the "perfect
+  recovery" conditions of Section V are NOT met here, yet recovery is still
+  reasonably close — delta_s' distance from delta_[k]\{s}=0.07; compare to
+  original/true update [0.40,0.90] of the selfish client.) It also notes
+  that with additional knowledge of phi, the theoretically optimal beta=0.4
+  (within 10% of the computed 0.45), giving an even closer delta_s' =
+  [0.44, 0.91].
+- Example 6: the global update after RFL-Self aggregation,
+  delta_[k] = (delta_1+delta_2+delta_3+delta_4+delta_s')/5 = [-0.11, 0.61],
+  whose distance from the untampered true global update [-0.13, 0.60] is
+  only 0.03.
+
+--------------------------------------------------------------------------
+Robust Aggregation (server-side substitution step, Eq. 10)
+--------------------------------------------------------------------------
+delta_[k] = (1/Gamma) ( sum_{i in [k]\S} delta_i + sum_{j in S} delta_j' )
+Global model update: w = w + delta_[k].
+This substitutes ONLY the detected-selfish clients' crafted updates with
+their recovered counterparts delta_j'; all other clients' updates pass
+through unchanged. RFL-Self is a server-side-only modification of FedAvg
+aggregation — no change needed on the client side, making it a drop-in
+replacement/compatible wrapper around FedAvg.
+Overall complexity of RFL-Self = O(dk log k) (dominated by computing the
+median, which is O(dk log k); Algorithm 1's detection cost O(dk + k log k)
+is comparatively negligible).
+
+--------------------------------------------------------------------------
+ALGORITHM 2: RFL-Self Algorithm (full per-round procedure, server-side)
+--------------------------------------------------------------------------
+Input: set of k clients
+Output: trained global model weights w_[k]
+
+1.  w_[k] <- random initialization
+2.  Send w_[k] to all clients
+3.  for each communication round do
+4.      Receive updates {delta_i, for all i in [k]}
+5.      Compute N <- {||delta_i||, for all i in [k]}
+6.      Compute delta_med <- MARGINALMEDIAN({delta_i, for all i in [k]})
+7.      S <- SELFISHUPDATESDETECTION({delta_i, for all i in [k]})   (Alg. 1)
+8.      for each client i in S:
+9.          Obtain beta by solving Eq. 9
+10.         Estimate delta_i' using Eq. 8
+11.     Update w_[k] <- w_[k] + (1/Gamma)( sum_{i in [k]\S} delta_i + sum_{j in S} delta_j' )
+12.     Send updated global model w_[k] to all clients
+13. return w_[k]
+
+--------------------------------------------------------------------------
+ALGORITHM 3: Dq-FFL Algorithm (dynamic-q fair FL, client + server)
+--------------------------------------------------------------------------
+Dq-FFL is described as "heavily inspired by" q-FFL [14], a variant of FedAvg
+with a dynamic boosting parameter q that increases fairness. q-FFL's
+objective (Eq. 11):
+w* = argmin_w sum_{i in [k]} F_i^{q+1}(w)
+(minimizes the sum of the (q+1)-th power of per-client losses rather than
+the plain average, Eq. 1). q=0 reduces to FedAvg; q -> infinity reduces to
+Agnostic FL (minimax over worst client). Higher q = more fairness at the
+cost of average accuracy.
+
+Dq-FFL's key difference from static q-FFL: the boosting parameter q is
+DYNAMICALLY computed PER CLIENT, scaling the global q hyperparameter by the
+ratio between the loss l_i experienced by that client in the PREVIOUS round
+and the median loss l_med across clients:
+  q_i = q ^ (l_med / l_i)      [client-side, when round != 0; when round==0,
+                                 q_i = q directly, i.e., first round uses the
+                                 plain q, since there is no previous-round
+                                 loss yet]
+This emphasizes/boosts updates from clients with the largest loss (clients
+losing more relative to the median get pushed toward higher effective
+exponent / larger weighting), mirroring q-FFL's fairness intent but adapted
+per-client dynamically.
+
+Algorithm 3 pseudocode:
+Input: set of k clients, learning rate L, parameter q (controls fairness
+level)
+Output: trained global model weights w_[k]
+
+1.  w_[k] <- random initialization
+2.  Send w_[k] to all clients
+3.  for each communication round do
+4.      for i in [k] do
+            At Client:
+5.          delta_i <- LOCALTRAINING(w_[k])
+6.          if round == 0 then
+7.              q_i <- q
+            else
+9.              q_i <- q ^ (l_med / l_i)
+10.         omega_i <- q F_i^{q_i - 1}(w_[k]) ||delta_i||^2 + L F_i^{q_i}(w_[k])
+11.         delta_i <- F_i^{q_i}(w[k]) * L * delta_i
+12.         l_i <- F(w[k])
+13.         Send delta_i, omega_i, l_i to the server
+            At FL Server:
+14.     Receive {delta_i}, {omega_i}, {l_i} for all i in [k]
+15.     Update w_[k] <- w_[k] + ( sum_{i in [k]} delta_i ) / ( sum_{i in [k]} omega_i )
+16.     l_med <- median({l_i, for all i in [k]})
+17.     Send global model w_[k] and l_med to all clients
+18. return w_[k]
+
+(Note: step numbering 7/9 — step 8 is implied as the "else" branch marker;
+the paper's printed algorithm skips directly from the "if round==0" line 6-7
+to an "else" at what is labeled line 9 in the source; reproduced here exactly
+as in the paper, including the apparent line-number gap.)
+
+The server computes Gamma dynamically each round as the sum of all omega_i
+(this is how Dq-FFL's Gamma differs from FedAvg's fixed Gamma=k). The server
+also broadcasts l_med back to clients each round so each client can compute
+its own q_i for the next round.
+
+FairRFL = the joint/combined use of RFL-Self (robust detection+recovery) and
+Dq-FFL (dynamic fairness weighting) together.
+
+--------------------------------------------------------------------------
+Theoretical guarantees (Section V) — not needed for configs, summarized briefly
+--------------------------------------------------------------------------
+- Three conditions for "perfect" recovery: (1) average update of non-selfish
+  clients doesn't change much between consecutive rounds, (2) median update
+  delta_med reliably approximates the mean update of non-selfish clients,
+  (3) the true update delta_s of a selfish client has a magnitude comparable
+  to N_med.
+- Theorem 2: bounds the maximum error in the recovered aggregated update:
+  E||delta_i - delta_[k]||^2 / E[omega] <= (4k + k^2)/(4*Gamma^2) *
+  Tr(var(delta)) * E[omega]. For FedAvg (Gamma=k, omega=1) this simplifies
+  to (1/k + 1/4) Tr(var(delta)).
+- Theorem 3: convergence rate of RFL-Self, under 3 standard assumptions
+  (median is unbiased estimator of mean update; F has Lipschitz gradient;
+  bounded variance of updates), derives (Eq. 15):
+  (1/T) sum_t E[F(w_[k]^t)] <= 2*sqrt(k/T)*(D_F + L*sigma^2) + (1/T) sum_t
+  E[||grad F(w_[k]^t) - E[delta_med]||^2], with lambda = min(1/sqrt(Tk), 1/2L)
+  and D_F = F(w_[k]^0) - F(w*). Convergence rate ~ sqrt(k/T), comparable to
+  FedAvg's sqrt(1/(kT)) rate, with extra variance term from median-based
+  aggregation under non-IID data.
+
+===============================================================================
+4. EXPERIMENTS SECTION (EXHAUSTIVE — primary section for config-building)
+===============================================================================
+
+--- 4.1 Datasets used ---
+The paper states explicitly: "We use two benchmark datasets: CIFAR-10 [44],
+an image classification task, and WISDM-W, a time-series human activity
+recognition task from the FedAIoT benchmark [45]."
+
+YES — CIFAR-10 IS one of the two datasets used. The other is WISDM-W
+(Wireless Sensor Data Mining - Watch, a human-activity-recognition
+time-series dataset, drawn from the FedAIoT federated-learning benchmark,
+ref [45]: S. Alam et al., "FedAIoT: A federated learning benchmark for
+artificial intelligence of things," arXiv:2310.00109, 2023).
+
+The paper explicitly states these two datasets were chosen "due to their
+popularity in the FL community and their different levels of complexity,
+which allows us to evaluate the performance of our proposed method in
+diverse scenarios."
+
+Explicitly excluded: CIFAR-100 is NOT used. Quote: "Larger datasets like
+CIFAR-100 [44] are not considered, as the lack of overlap between the
+classes of the clients would make the selfishness detection trivial."
+(Same ref [44] citation is used for both CIFAR-10 and CIFAR-100, i.e. the
+Krizhevsky "Learning multiple layers of features from tiny images" tech
+report.)
+
+--- 4.2 Client / federation setup ---
+- Number of clients: 50 clients ("Experiments were carried out with 50
+  clients at varying levels of selfishness phi and up to 30% selfish
+  clients.")
+- Selfish client fractions tested: up to 30% selfish clients (explicit
+  fractions tested in Table III: 0%, 10%, 20%, 30%).
+- Selfishness parameter phi: varied; main ablations sweep phi over
+  {0, 0.2, 0.4, 0.6, 0.8, 1} (as plotted in Figs. 8, 9, 12, 13) and also
+  continuous curves in Figs. 10, 15; fixed-phi comparisons in Table III and
+  Fig. 14 use phi = 0.7 specifically ("We choose these values of phi with
+  the help of parts (b) and (d) of Figure 8... at phi=0.7, with multiple
+  selfish clients, the model is greatly perturbed, and a single selfish
+  client can achieve a significant accuracy gain.").
+- Non-IID data partitioning (main/default scheme): "we partition the
+  dataset such that each client gets only the data for two randomly selected
+  classes." This is described as a "severe non-IID setting," chosen
+  specifically "to showcase the effect of selfish clients better: if the
+  data is IID, then all the clients have the same local objective, and the
+  selfish clients would have no incentive to act selfishly."
+- Additional non-IID skew levels tested (Section VI-B / Figure 10, "label
+  distribution skew" ablation, fixed phi=0.7): IID, Dirichlet with
+  alpha in {1, 0.1, 0.01}, and the partitioned (2-class-per-client) scheme.
+  Quote: "The degree of label distribution skew varies from an IID
+  distribution (i.e., each client has data from all the classes with equal
+  probability) to a partitioned non-IID distribution (i.e., each client has
+  data from only two classes), with two intermediate settings where the
+  skew is determined by the Dirichlet distribution with parameters
+  alpha in {1, 0.1, 0.01}."
+  Finding: in IID settings selfishness has negligible impact; even mild
+  non-IID causes significant degradation, worsening as skew increases; with
+  multiple selfish clients the degradation is more pronounced than with a
+  single selfish client, across all non-IID settings.
+
+--- 4.3 Model architectures ---
+- WISDM-W: "we utilize a ResLSTM architecture comprising 4 Long Short-Term
+  Memory cells with residual connections."
+- CIFAR-10: "we employ a CNN with 3 convolutional layers and 2 fully
+  connected layers."
+
+--- 4.4 Hyperparameters (explicitly stated) ---
+Quote: "The hyper-parameters used are as follows: optimizer: SGD, batch
+size: 32/256, and learning rate: 0.01/0.1 for WISDM-W/CIFAR-10 datasets,
+respectively."
+  => WISDM-W: batch size = 32, learning rate = 0.01
+  => CIFAR-10: batch size = 256, learning rate = 0.1
+  (optimizer SGD for both datasets)
+- Communication rounds: "The models are trained over 30 FL rounds"
+- Local epochs: "each client performing five local epochs per round to
+  strike a balance between communication efficiency and convergence speed."
+- Client selection: "Unless otherwise specified, the results are obtained
+  by selecting all clients for aggregation in each round to reduce spurious
+  effects due to client selection." (i.e., full client participation is the
+  default; a separate ablation in Section VI-E analyzes selfish clients that
+  are NOT persistently selfish across rounds — see 4.7 below — this is about
+  selfish BEHAVIOR persistence, not client sampling/selection fraction.)
+- Implementation: Python, PyTorch 1.12.1, run on Windows 11, NVIDIA RTX
+  A5000 GPU.
+- Source code: publicly available at https://github.com/ndslab-group/FairRFL
+  (per paper's own statement).
+
+--- 4.5 Detection hyperparameter (tau) ---
+- tau = 2.5 is the value used throughout main experiments, chosen "after
+  testing different values in the range [0,6]." Quote: "The heuristic
+  choice of tau=2.5 appears to be a good compromise between achieving a high
+  accuracy in the detection process, avoiding the inclusion of too many
+  normal clients in the set of suspected selfish clients, and ensuring 100%
+  recall with all selfish clients detected."
+- Sensitivity analysis (Figure 11): detection accuracy/recall vs tau swept
+  continuously over tau in [0,4] (approx., based on axis), evaluated at
+  phi=0.7, with both 1 and 15 selfish clients, on both WISDM-W and CIFAR-10.
+  Detection accuracy is described as high on average but "slightly lower"
+  for CIFAR-10 than WISDM-W — hypothesized to be because larger models
+  (WISDM-W's ResLSTM) make selfish updates more distinct from normal ones in
+  norm, whereas CIFAR-10's shallower CNN layers learn more generic features
+  with smaller update-norm impact from selfishness. Even at CIFAR-10's lower
+  detection accuracy, RFL-Self still "correctly identify[ies] all the
+  selfish clients" (100% recall) while maintaining an "acceptable false
+  positive rate." At higher tau values, some selfish updates go undetected
+  (unacceptable, since undetected selfishness still causes disruptive
+  accuracy impact per Section VI-B).
+
+--- 4.6 Selfish-client simulation mechanics ---
+- Selfish clients are simulated via the phi-parameterized update-crafting
+  mechanism of Eq. 5 (NOT a standard Byzantine/label-flip/noise attack).
+  Selfish clients are explicitly defined as non-malicious: they craft
+  updates via Eq. 3-5 to pull the global model toward their own local
+  optimum, using an ESTIMATE of Gamma and of other clients' average update
+  (delta-bar_[k]\{s}), computed from past-round updates (since they lack
+  direct access to this info — see Section III).
+  - Fraction of selfish clients tested: 1 selfish client, 15 selfish clients
+    (out of 50) in most figures (Figs. 8, 9, 12, 13); and systematically
+    0%/10%/20%/30% selfish clients in Table III.
+  - phi swept over {0, 0.2, 0.4, 0.6, 0.8, 1.0} in the box-plot figures; also
+    continuous sweep in Figure 11/17 analyses.
+  - For the Dq-FFL dynamic-q mechanism robustness test, the paper explicitly
+    notes an assumption: "While testing this algorithm, we assume that the
+    selfish clients also upscale the transmitted loss l_i so that it becomes
+    compatible with their larger update and tries to skew l_med" — i.e. they
+    model an adaptive/adversarial selfish client that also manipulates its
+    reported loss to try to game the dynamic-q fairness mechanism.
+  - Section VI-E ablation: non-persistent selfish clients — selfish
+    behavior active only a FRACTION of FL rounds. Variable: percentage of FL
+    rounds in which selfish behavior is active, swept 0% (never selfish) to
+    100% (always selfish) (Figure 15); and categorical round-range framing
+    in Figure 16 — "Start" = rounds 1-10, "Middle" = rounds 11-20, "End" =
+    rounds 21-30 (out of the 30 total rounds), plus "Never" and "Always"
+    conditions. Figure 17 additionally sweeps "persistence of selfish
+    clients" (fraction p of rounds selfish) against varying phi in
+    {0.3, 0.5, 0.7}, with 1 selfish client, on both datasets.
+
+--- 4.7 Results / numbers reported ---
+
+Abstract-level headline numbers (quoted):
+"a selfish client can increase the model accuracy on its data by up to 39%
+and more than quadruple the accuracy variance among clients, which Fair-RFL
+can address perfectly and recover performance fairness nearly perfectly
+across normal clients." [Paraphrase note: exact wording is "...can address
+perfectly and recover performance fairness across normal clients" per the
+abstract shown on page 1 — the "up to 39%" accuracy increase and "more than
+quadruple" variance increase are the key headline quantitative claims.]
+
+TABLE III — "Performance Comparison of Different Approaches for an FL Setup
+With the Varying Number of Selfish Clients and phi = 0.7"
+Columns: ACC_n (avg accuracy of normal clients, %), ACC_s (avg accuracy of
+selfish clients, %), STD (std dev of accuracy across all clients), reported
+separately at 0%, 10%, 20%, 30% selfish clients, for both WISDM-W and
+CIFAR-10.
+
+WISDM-W:
+Approach      | 0% selfish: ACC_n, STD       | 10%: ACC_n, ACC_s, STD        | 20%: ACC_n, ACC_s, STD        | 30%: ACC_n, ACC_s, STD
+FedAvg        | 62.10, -, 16.95              | 46.22, 70.20, 18.73           | 44.93, 71.17, 18.36           | 43.00, 73.40, 20.57
+q-FFL         | 62.30, -, 16.74              | 45.02, 57.20, 17.81           | 45.93, 19.00, 18.36           | 48.20, 19.13, 16.36
+Dq-FFL        | 62.30, -, 16.68              | 46.62, 65.90, 17.56           | 45.93, 68.30, 18.36           | 48.20, 75.27, 17.42
+Median        | 53.52, -, 17.08              | 43.07, 55.60, 17.10           | 37.31, 51.80, 16.69           | 37.74, 43.67, 16.92
+FedMut        | 60.92, -, 16.92              | 15.93, 37.93, 18.00            | 32.76, 31.00, 18.36            | 22.36, 27.13, 16.36
+FedCDA        | 63.56, -, 17.40              | 47.79, 71.60, 18.38           | 46.02, 63.90, 18.30           | 38.60, 57.87, 20.43
+RFL-Self      | 62.10, -, 16.95              | 61.23, 63.20, 17.06           | 58.92, 59.90, 17.38           | 58.17, 61.40, 17.80
+q-FFL+RFL-Self| 62.30, -, 16.74              | 61.07, 63.00, 17.52           | 59.40, 60.40, 17.52           | 58.17, 60.33, 17.19
+FairRFL       | 61.33, -, 16.64              | 61.31, 63.20, 16.22           | 59.60, 60.80, 15.71           | 60.91, 68.27, 15.57
+
+CIFAR-10:
+Approach      | 0% selfish: ACC_n, STD       | 10%: ACC_n, ACC_s, STD        | 20%: ACC_n, ACC_s, STD        | 30%: ACC_n, ACC_s, STD
+FedAvg        | 61.14, -, 6.89               | 57.47, 34.60, 15.85           | 42.85, 50.90, 19.34           | 43.60, 49.97, 18.99
+q-FFL         | 60.44, -, 6.70               | 51.49, 74.60, 17.83           | 56.58, 63.40, 9.55             | 59.23, 62.93, 8.54
+Dq-FFL        | 60.36, -, 6.86               | 53.93, 73.40, 16.19           | 55.92, 63.80, 10.91            | 54.37, 57.73, 11.33
+Median        | 56.18, -, 7.07               | 53.91, 52.20, 6.91             | 39.83, 33.69, 8.60             | 30.29, 52.13, 6.96
+FedMut        | 58.28, -, 10.10              | 41.69, 56.60, 21.45            | 47.49, 51.49, 18.00            | 37.49, 41.93, 17.19
+FedCDA        | 55.20, -, 10.10              | 51.15, 57.10, 7.57              | 39.83, 56.60, 14.49            | 37.47, 41.93, 17.39
+RFL-Self      | 59.64, -, 7.42               | 59.19, 54.40, 7.24              | 59.12, 60.00, 6.87              | 59.02, 59.50, 6.68
+q-FFL+RFL-Self| 59.22, -, 7.05               | 59.71, 53.20, 6.81              | 59.02, 59.50, 6.68              | 58.11, 59.67, 6.86
+FairRFL       | 59.64, -, 6.73               | 59.72, 53.20, 6.67              | 59.58, 60.80, 6.62              | 59.20, 60.40, 6.52
+
+[NOTE: the WISDM-W FedMut row (10/20/30% columns) and CIFAR-10 FedCDA row
+were re-checked against the full-resolution page image (page 14 of the PDF,
+printed page 329) and are now transcribed with higher confidence than the
+first pass, but digit-level OCR noise is still possible for these two rows
+specifically given the small print and dense table. If these exact numbers
+are load-bearing for a thesis claim, do a final manual cross-check against
+the PDF table directly. All other rows (FedAvg, q-FFL, Dq-FFL, Median,
+RFL-Self, q-FFL+RFL-Self, FairRFL) were read with high confidence on both
+passes and are consistent.]
+
+Table footnote: "ACC_n: Average accuracy of normal clients, ACC_s: Average
+accuracy of selfish clients, STD: Standard deviation of the accuracy of all
+clients."
+
+Narrative accompanying Table III (quoted/paraphrased key claims):
+- "With the notable exception of the underperforming median, most approaches
+  achieve comparable accuracy when no selfish clients are present."
+- "the accuracy can get as low as 18.93% if no mitigation strategy is
+  employed" (this appears to reference the q-FFL WISDM-W 20% selfish-clients
+  ACC_s column, 19.00, consistent with a very low selfish-client accuracy
+  under q-FFL without RFL-Self mitigation — exact attribution to which
+  cell should be verified against original table if used precisely).
+- "the standard deviation of the accuracy experienced by the clients reaches
+  up to 20.57 for the FedAvg algorithm" (WISDM-W, 30% selfish clients, STD
+  column = 20.57, matches table).
+- "Excluding FedAvg, in the presence of selfish clients, FedCDA experiences
+  the highest increase in the standard deviation of normal clients."
+- "RFL-Self ensures a balance between the accuracy of normal and selfish
+  clients while preserving the overall system performance, regardless of the
+  proportion of selfish clients. By itself, however, RFL-Self cannot tackle
+  the fairness requirements."
+- "Naively combining RFL-Self with q-FFL does not achieve the desired
+  fairness either. Indeed, in some occurrences, this combination experiences
+  a standard deviation of accuracy up to 13% larger than that experienced by
+  RFL-Self alone."
+- "The FairRFL [i.e., RFL-Self + Dq-FFL combined], instead, can effectively
+  reduce the unfairness in the system, while maintaining a comparable
+  accuracy to that of RFL-Self for both normal and selfish clients."
+- "FairRFL outperformed on the CIFAR-10 dataset only in the absence of
+  selfish clients, and the best-performing strategy in this case is Dq-FFL."
+- "On the WISDM-W dataset, in the 0% selfish clients setting FairRFL is
+  outperformed by FedMut, albeit by a negligible difference of 0.09."
+
+Other reported figures/findings (without exact numeric tables, described
+narratively; all are from Figures 6-17, described qualitatively since exact
+per-point values are not tabulated in text):
+
+- Figure 6 (Gamma estimation, FedAvg vs Dq-FFL, 1 selfish client): the
+  selfish client's estimation technique correctly converges to the true
+  Gamma for FedAvg (fixed Gamma=k=50 implied since 50 clients) across both
+  datasets; for Dq-FFL, Gamma is dynamic (computed as sum of omega_i) and
+  spans "multiple orders of magnitude" for CIFAR-10, but the estimation
+  still closely tracks true Gamma.
+- Figure 7 (cosine similarity between true and estimated global update by
+  the selfish client, FedAvg and Dq-FFL, both datasets): cosine similarity
+  "hovering around 0.8," described as "a strong alignment between the true
+  and estimated updates" — meaning the selfish client's Gamma/other-clients
+  estimation technique (Section III) works well in practice.
+- Figure 8 (FedAvg, test accuracy vs phi in {0,0.2,...,1}, 1 vs 15 selfish
+  clients, CIFAR-10 and WISDM-W): normal-client mean accuracy declines
+  steadily as phi rises, for CIFAR-10 stabilizing beyond phi>0.6 (selfish
+  clients' own accuracy plateaus too); WISDM-W trend similar but less
+  smooth. With MULTIPLE selfish clients (15), they fail to gain significant
+  advantage over each other (they "compete" and cancel out each other's
+  gains), and average outcome for normal clients steadily worsens as phi
+  increases — described as making the model "unfair and unreliable for
+  normal participants."
+- Figure 9 (Dq-FFL, same sweep): with 1 selfish client, little difference
+  from FedAvg (Dq-FFL's fairness mechanism works to counteract the single
+  selfish client effectively). With 15 selfish clients, instability is
+  somewhat mitigated for LOW phi values (hinting fairness mechanisms alone
+  provide partial defense), but for WISDM-W at higher phi, negative impact
+  of selfish clients is exacerbated, "significantly degrading the global
+  model accuracy for normal clients" — more pronounced for WISDM-W,
+  attributed to its larger model size (ResLSTM) allowing more disruptive
+  crafted updates.
+- Figure 10 (non-IID skew ablation, phi=0.7 fixed): described in 4.2 above.
+- Figure 11 (detection tau sweep): described in 4.5 above.
+- Figure 12 / 13 (RFL-Self, FairRFL, FedAvg, q-FFL compared across phi
+  sweep, 15 selfish clients, CIFAR-10 / WISDM-W respectively): "when phi >
+  0.4, selfishness can lead to significant accuracy loss for both normal and
+  selfish clients in the absence of robust aggregation at the server." q-FFL
+  alone "reduces the instability induced by selfish clients" but "still
+  leads to a significant drop in accuracy and a high variance in the
+  performance for all the clients, negating the attempts at fairness" — as
+  little as phi=0.1 is enough to increase variation substantially under
+  q-FFL alone. All evaluated mitigation strategies (RFL-Self, FairRFL)
+  "appear to perform effectively by stopping selfish clients from causing
+  substantial accuracy drops." Dq-FFL (within FairRFL) "can noticeably
+  reduce the inter-client accuracy variance" — standard deviation of
+  accuracy is "noticeably reduced for both datasets compared to the results
+  with RFL-Self" alone. "the level of selfishness has a negligible impact on
+  the model when FairRFL is employed, confirming its effectiveness."
+- Figure 14 (bar chart, F1-score, normal vs selfish clients, 1 selfish
+  client, phi=0.7, WISDM-W and CIFAR-10): compares FedAvg, q-FFL, Dq-FFL,
+  Median, FedMut, FedCDA, RFL-Self, q-FFL+RFL-Self, FairRFL — no exact F1
+  values given in extractable text, bar chart only (values not stated
+  numerically in body text).
+- Section VI-D baselines compared against (full list): FedAvg, q-FFL,
+  Dq-FFL (ablation component), Median (robust aggregation baseline), FedMut
+  [31] ("sends carefully mutated versions of the global model to clients to
+  limit the impact of heterogeneity, which is the underlying motivation for
+  selfish behavior"), FedCDA [30] ("employs a buffer of historical updates
+  to mitigate the divergence between the current local updates and the
+  overall global objective, which is the mechanism exploited by selfish
+  clients"), RFL-Self (this paper's detection+recovery alone), q-FFL +
+  RFL-Self (naive combination, NOT equivalent to proposed FairRFL), and
+  FairRFL (proposed: RFL-Self + Dq-FFL).
+  Finding: "varying label skew, reducing the heterogeneity (as done by
+  FedMut) has a limited effect, comparable to FedAvg." "FedCDA, by still
+  including selfish updates in the aggregation, ends up interfering with the
+  Gamma estimation, leading to stronger selfish updates and a worse outcome
+  for normal clients."
+- Section VI-E (non-persistent selfish clients, Figures 15-17): setup is
+  same 50 clients, phi=0.7 fixed, varying the PERCENTAGE of FL rounds (0% to
+  100%) in which selfish behavior is active.
+  Figure 15: non-persistent selfish clients can still cause significant
+  accuracy reduction for normal clients and high accuracy std dev if
+  unmitigated (FedAvg, parts b/d); FairRFL (parts a/c) mitigates effectively,
+  maintaining "almost the same accuracy to both classes of clients and a
+  similar standard deviation irrespective of the percentage of FL rounds
+  influenced by selfishness."
+  Figure 16: impact of selfishness restricted to specific stages — "Never,"
+  "Start" (rounds 1-10), "Middle" (rounds 11-20), "End" (rounds 21-30),
+  "Always" — impact of selfish clients "mostly appeared in the late stages
+  of the FL process, where the model is already close to convergence,"
+  hypothesized because selfish clients can better estimate/exploit the
+  model's proximity to convergence to craft better updates. RFL-Self
+  "effectively mitigate[s] the selfish clients" across all these stage
+  conditions.
+  Figure 17: impact of different selfishness levels (phi in {0.3,0.5,0.7})
+  with varying persistence (fraction of rounds, 1 selfish client, both
+  datasets) — "without proper mitigation, a selfish client can manifest a
+  significant negative impact even if it is not selected for most of the FL
+  rounds."
+
+===============================================================================
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+===============================================================================
+
+- RFL-Self is a SERVER-SIDE-ONLY modification to FedAvg aggregation; it
+  requires NO change on the client side, so it is a drop-in, compatible
+  substitute for standard FedAvg aggregation (quote: "RFL-Self modifies the
+  server-side aggregation process compared to FedAvg, making it compatible
+  as a direct substitute without requiring any change on the client side.").
+  Dq-FFL, in contrast, DOES require client-side changes (clients compute
+  their own q_i, omega_i, delta_i scaling, and l_i each round per Algorithm
+  3) — i.e., FairRFL (the joint combination) requires both server-side
+  (RFL-Self: median computation, detection, recovery, substitution) and
+  client-side (Dq-FFL: dynamic q scaling) logic.
+- Complexity summary: Algorithm 1 (detection) O(dk + k log k); per-client
+  beta-solving (Eq. 9) O(d) per suspected client; overall RFL-Self O(dk log
+  k), dominated by the median computation cost.
+- Baselines/ablation components precisely defined:
+  - "RFL-Self" alone = detection + recovery + robust aggregation, NO
+    fairness/Dq mechanism.
+  - "q-FFL + RFL-Self" = naive combination of RFL-Self with STATIC q-FFL
+    (not dynamic Dq-FFL) — shown to be suboptimal / can increase STD vs
+    RFL-Self alone by up to 13%.
+  - "FairRFL" = RFL-Self + Dq-FFL (the proposed joint strategy), the only
+    configuration that reduces unfairness (variance) effectively while
+    keeping accuracy comparable to RFL-Self alone.
+  - "Dq-FFL" alone (no RFL-Self) is also evaluated as a standalone ablation
+    row in Table III and in Figs. 9, 12, 13 (labeled "Dq-FFL") — it improves
+    over plain q-FFL/FedAvg somewhat but doesn't fully solve the robustness
+    side on its own (large model/WISDM-W high-phi case still degrades per
+    Fig. 9 discussion).
+  - Theoretical analysis assumes an ODD number of clients to ensure the
+    median is well-defined (stated explicitly as one of the convergence
+    analysis assumptions, Section V-B, point/assumption list before Theorem
+    3). NOTE: 50 clients (the actual experimental client count) is EVEN —
+    the odd-client assumption is for the theoretical analysis only, not
+    necessarily exactly satisfied in the 50-client experimental setup; the
+    paper does not reconcile this explicitly in the extracted text.
+  - Selfish clients act INDEPENDENTLY, with NO collusion/coordination among
+    themselves (explicitly stated: "we consider them to act independently
+    without any form of collaboration or collusion among themselves...
+    Modeling the behavior of collaborating/colluding selfish clients on a
+    common FL task is an interesting direction for future work, but it is
+    beyond the scope of this paper"). With multiple selfish clients present,
+    they effectively COMPETE with each other (each tries to pull the global
+    model toward its own local optimum), which was shown (toy example,
+    Section III-C) to cancel out individual gains and worsen outcomes for
+    everyone including the selfish clients themselves over successive
+    rounds.
+  - Distinction vs malicious/Byzantine/backdoor clients emphasized
+    throughout (Table II, "Comparison of Misbehaving and Faulty Client Types
+    in FL"): Selfish (opportunistic, maximize local performance, biased
+    updates, harms generalization/fairness, mitigated via "true update
+    recovery") vs Free-Rider (opportunistic, minimal/no updates, minimal
+    impact, mitigated via contribution incentives) vs Byzantine/Backdoor
+    (malicious, adversarial/trigger-targeted updates, prevents
+    convergence/compromises specific-input behavior, mitigated via robust
+    aggregation/anomaly detection) vs Faulty/Hardware (benign, noisy/
+    corrupted updates, random accuracy degradation, mitigated via error
+    correction/update filtering).
+
+===============================================================================
+GAPS / THINGS NOT STATED IN THE PAPER (flagged explicitly, not inferred)
+===============================================================================
+- Exact train/test split sizes, number of samples per client, or total
+  dataset sizes for CIFAR-10/WISDM-W partitioning are NOT stated numerically
+  beyond "each client gets only the data for two randomly selected classes."
+- Exact CNN architecture details for CIFAR-10 (channel counts, kernel
+  sizes, FC layer widths) beyond "3 convolutional layers and 2 fully
+  connected layers" are NOT given.
+- Exact ResLSTM architecture details for WISDM-W beyond "4 LSTM cells with
+  residual connections" are NOT given.
+- Exact values of q used for q-FFL/Dq-FFL baseline experiments are NOT
+  stated numerically anywhere in the extracted text (the paper discusses q
+  conceptually — q=0 reduces to FedAvg, q->infinity reduces to Agnostic FL —
+  but does not give the specific numeric q value(s) used to produce Table
+  III or Figures 12-14 results). This should NOT be assumed/guessed for
+  config-building; flagged as an open gap.
+- Exact momentum, weight decay, or LR schedule (if any) are NOT mentioned —
+  only "optimizer: SGD, batch size: 32/256, learning rate: 0.01/0.1" is
+  given, no mention of momentum or weight decay values.
+- Random seeds, number of repeated runs / error-bar methodology (e.g.,
+  whether box-plot whiskers/error bars in Figs. 8-9, 12-13, 15-17 represent
+  std dev across clients only, or also across repeated runs/seeds) are not
+  explicitly detailed beyond what's described per-figure.
+- Table III's Median, FedMut, and FedCDA rows (especially on CIFAR-10, and
+  the WISDM-W FedMut 10/20/30% cells) had OCR/extraction ambiguity as
+  flagged inline above — these specific cells should be re-verified against
+  the original PDF table rendering before being used for precise numeric
+  citations.

@@ -1,0 +1,610 @@
+FAIRWEIGHT — EXTRACTION FOR IMPLEMENTATION
+(Read in full from the 13-page PDF: pages 1-13, including Appendix A/B/C. No pages were skipped.)
+============================================================
+
+1. CITATION
+============================================================
+Harsh Kasyap, Ugur Ilker Atmaca, Carsten Maple, Nic Lane.
+"FairWeight: Private Fairness-aware Aggregation using Model Interpretation based
+Weightage in Federated Learning."
+IEEE Transactions on Services Computing (TSC), 2026.
+DOI: 10.1109/TSC.2026.3686323
+(Author's accepted version, published in JOURNAL OF LaTeX CLASS FILES, VOL. 18, NO. 9,
+SEPTEMBER 2020 template — the DOI/venue stamp confirms IEEE TSC 2026.)
+
+Affiliations: Harsh Kasyap — IIT BHU Varanasi (and honorary research fellow, University of
+Warwick / Alan Turing Institute). Ugur Ilker Atmaca — Abdullah Gul University, Turkiye
+(honorary research fellow, Warwick). Carsten Maple — University of Warwick / Alan Turing
+Institute. Nic Lane — University of Cambridge (and Flower Labs).
+
+Code reference given in paper: https://tinyurl.com/fairweight (said to be the implementation
+used as baseline for FairTrade, which FairWeight builds on/compares against).
+
+
+2. PROBLEM SETUP
+============================================================
+Federated learning (FL) trains a shared global model across clients without centralizing raw
+data, but when client data is heterogeneous (non-IID) — including heterogeneity in sensitive/
+protected attributes such as gender, race, age, not just label imbalance — the global model can
+become accurate overall while still discriminating against (performing worse on) a minority
+group defined by a sensitive attribute. Existing fixes are either purely local debiasing (doesn't
+generalize well as heterogeneity increases), or global debiasing schemes (FairFed, FairTrade)
+that either only target the fairness metric while ignoring balanced accuracy, or are costly to
+tune/communicate. FairWeight's core idea: instead of reweighting/penalizing the *entire* local
+model update when it's biased, use a model-interpretation technique (Shapley-value-style weight
+importance) to identify which *specific coordinates/parameters* in a client's model are
+responsible for the bias and misclassification against the minority sensitive-attribute group,
+and penalize/incentivize the aggregation weight of the model updates COORDINATE-WISE
+(per-parameter) rather than penalizing the whole model. This is done under demographic parity
+(primary fairness notion) and also evaluated under causal group fairness (FACE), while
+preserving privacy of both raw local data and the identified "biased weight" indices via secure
+aggregation (SecAgg) or homomorphic encryption (HE, CKKS scheme).
+
+Sensitive-attribute setup: binary classification tasks, with a single sensitive/protected
+attribute A having binary values (two groups, called s and s' in the weight-importance
+discussion, or group A=0 / A=1 in the demographic parity definition). The paper notes a
+multi-class sensitive attribute could be handled via one-vs-all (repeat the whole pipeline per
+attribute, e.g., once for gender, once for race), citing a similar approach from prior work [25],
+but this is not empirically evaluated in the experiments — all 5 datasets used are evaluated with
+single binary sensitive attributes (per dataset), run attribute-by-attribute where more than one
+is listed.
+
+
+3. ALGORITHM
+============================================================
+
+3.1 Demographic Parity (fairness notion used), Definition 1, Eq. (3)
+---------------------------------------------------------------
+    | P(Ŷ=1 | A=0) − P(Ŷ=1 | A=1) | ≤ ε                                    (3)
+
+Smaller ε = more fair; ε = 0 means exact statistical parity. Ŷ is the predicted outcome, A the
+sensitive attribute.
+
+Also defined but used as a secondary "generalisability" check (not the primary metric in the
+main comparison tables):
+- Definition 2, Causal Group Fairness / FACE (average treatment effect, modified from [12]),
+  Eq. (4):
+    FACE = E( |Y^{A1}_pot − Y^{A1}_pred| − |Y^{A0}_pot − Y^{A0}_pred| )
+         = (1/n) Σ_{i=1}^{n} ( |Y^{A1}_{pot_i} − Y^{A1}_{pred_i}| − |Y^{A0}_{pot_i} − Y^{A0}_{pred_i}| )     (4)
+  Value of 1 or −1 = complete unfairness; 0 = complete fairness.
+
+- Definition 4, Global Fairness, Eq. (9) — demographic parity computed across the whole
+  federation via secure aggregation, weighted by each client's data proportion w_k:
+    Σ_{k=1}^{K} w_k | P(Ŷ=1 | A=0, D_k) − P(Ŷ=1 | A=1, D_k) |                                (9)
+  Balanced accuracy globally is likewise Σ_{k=1}^{K} w_k · BA_k.
+
+3.2 Fairness-Constrained Optimization (Definition 3), the LOCAL penalty term
+---------------------------------------------------------------
+This is the per-client local training objective FairWeight clients actually optimize (step 1 of the
+pipeline, "local fairness-constrained training module"), Eq. (5):
+
+    minimize_θ  L_k(θ) + ζ × F(θ)   s.t.  g(θ) ≤ e                                            (5)
+
+where:
+- L_k(θ) is the client's local empirical risk / predictive loss (Eq. 2: L_k(θ) = (1/|D_k|) Σ_{(x,y)∈D_k} ℓ(θ,x,y)).
+- F(θ) is the fairness loss term, with regularisation constant ζ (bounded by budget e via
+  constraint g(θ) ≤ e).
+- For each fairness metric, a set of linear constraints is generated as Qη(f) ≤ e, Q a matrix,
+  η(f) a vector of conditional moments (this constraint machinery is adopted from the FairTrade
+  baseline [12], cited as "the authors in [12] define a constraint for Demographic Parity (DP) as").
+
+Demographic-parity constraint (Eq. 6), which IS the penalty term used in local optimization:
+
+    F(θ) = ζ × ‖ (ReLU(Qη(f))) − e ‖₂                                                          (6)
+
+For binary classification + binary sensitive attribute, DP is represented as a pair of equality
+constraints per group A:
+- Positive deviation constraint: Δ⁺ := η_A(f) − η_{¬A}(f) ≤ 0
+- Negative deviation constraint: Δ⁻ := −η_A(f) + η_{¬A}(f) ≤ 0
+  (η_A(f) = the conditional moment / average prediction output for group A; keeps it close to
+  the complementary group's.)
+
+Matrix Q construction (Eq. 7, Eq. 8):
+    Q_{(A,Δ+),A'} = { 1 if A'=A; −1 otherwise }                                                (7)
+    Q_{(A,Δ-),A'} = { −1 if A'=A; 1 otherwise }                                                 (8)
+
+Interpretation given in the paper (around Eq. 9): Q_{(A,Δ+),A'} captures how much the group's
+average prediction EXCEEDS the rest of the population (upper bound on disparity);
+Q_{(A,Δ-),A'} captures the lower bound (reversed sign) ensuring the group's average prediction
+isn't substantially lower. Together they bound DP deviation in both directions.
+NOTE: Constraints for FACE "can be [similarly] defined" but the paper does not spell out the
+Q/η(f) construction for FACE explicitly beyond that one sentence — only DP gets the full
+Q-matrix definition.
+
+The regularisation constant ζ and budget e are stated in the Parameters subsection of Section V:
+"The learning rate is set as 0.001, and the regularisation constraint is 100." (This "regularisation
+constraint" = ζ in Eq. 5/6, read in context — the paper does not separately re-label it as "e" with
+a distinct numeric value; only one number, 100, is given for this constraint.) No explicit value
+for the budget e is separately stated.
+
+3.3 Shapley-value weight importance (WI) procedure
+---------------------------------------------------------------
+Step 2a of the pipeline. FairWeight computes Weight Importance (WI) using a Shapley-value
+(SV) based model-interpretation technique (Eq. 10, standard Shapley value definition over
+weights-as-players):
+
+    φ_j(v) = Σ_{S ⊆ W\{j}}  [ |S|!(w−|S|−1)! / w! ] × ( v(S∪{j}) − v(S) )                     (10)
+
+where φ_j(v) = importance of weight j, W = {1,...,w} the set of w weights, S ranges over subsets
+of weights, v(S) is the "characteristic function" = model prediction using only the weights in S
+(marginalized over excluded weights), computed as (Eq. 11):
+
+    v(S) = ∫ f̂(x1,...,xw) dW_{x∉S} − E_X(f̂(X))                                               (11)
+
+This is O(2^w) in general (combinatorial), so the paper APPROXIMATES it: repeatedly sample k
+weight parameters out of w total, via "unstructured pruning... provided by SV," reducing
+complexity from exponential O(2^w) to linear O(k).
+
+The marginal contribution term v(S∪{j}) − v(S) in Eq. 10 is approximated (Eq. 12) using a
+first-order Taylor expansion of the loss, as the absolute value of the product of gradient and
+weight:
+
+    |v(S∪{j}) − v(S)| = |−L(θ+dθ_j,x,y) + L(θ,x,y)|
+                       ≈ |∂L/∂θ_j · dθ_j| = |∂L/∂θ_j| |dθ_j| = |∂L/∂θ_j| |θ_j|                  (12)
+
+(|dθ_j| ≈ |θ_j − 0|, i.e. |θ_j|, since pruning zeroes the weight.) So WI for a weight ≈
+|gradient of loss w.r.t. that weight| × |weight value|, evaluated via one forward+backward pass
+on the pruned model.
+
+ALGORITHM 2 (Appendix A) — WEIGHTIMPORTANCE(data, weights), full pseudocode as given:
+  Input: repeats (number of repeats), k (number of weights to be randomly sampled/pruned)
+  Output: WI (Weight Importance / Shapley Value)
+  1. function WEIGHTIMPORTANCE(data, weights):
+  2.   n ← len(weights)
+  3.   WI ← [0 for i in n]
+  4.   for x, y in data:
+  5.     for r in repeats:
+  6.       indices ← rand(n, n−k)        # randomly select (n−k) weights to be PRUNED (zeroed)
+  7.       pruned_weights ← weights[indices] = 0
+  8.       pruned_model ← Load pruned_weights
+  9.       prediction(ŷ) ← pruned_model(x)
+  10.      loss ← L(y, ŷ)
+  11.      loss.backward()
+  12.      prev_index ← 0
+  13.      index ← 0
+  14.      for param in pruned_model.parameters():
+  15.        prev_index ← index
+  16.        index += len(param.flatten())
+  17.        if param.grad != None:
+  18.          w ← weights[prev_index:index]
+  19.          v ← ||param.grad.flatten()|| * w||     [elementwise, per the paper's notation]
+  20.          WI[prev_index:index] += v
+  21.        end if
+  22.      end for
+  23.    end for
+  24.  end for
+  25.  return WI
+  26. end function
+
+IMPORTANT — on the "b1/b2/c1/c2" sample-set naming the task description asked me to verify:
+the paper does NOT use literal symbols "b1, b2, c1, c2". The actual four sample categories used
+to motivate WHY coordinate-wise identification works (Section IV.2, "Identifying responsible
+weights", on p.5) are described in prose with this exact notation:
+  - tp_s   : positive (pos) samples with attribute value s, correctly classified as pos (true positive, group s)
+  - fn_s'  : pos samples with attribute value s', but misclassified as neg (false negative, group s')
+  - tp_s'  : pos samples with s', correctly classified as pos (true positive, group s')
+  - fp_s'  : neg samples with s', but misclassified as pos (false positive, group s')
+The paper's own framing: "Assume D_k has the majority of positive (pos) samples, and very few
+negative (neg) samples, especially for s'." The intuition: "the bias is primarily dominated by the
+samples from (i) and (ii) [tp_s, fn_s'], while the misclassification is dominated by (iii) and (iv)
+[tp_s', fp_s']. Then, adjusting the weights with the highest WIs of (i-ii) mitigates bias and (iii-iv)
+mitigates misclassification." These four sets are each run through WEIGHTIMPORTANCE
+(Algorithm 2) separately (using data drawn from each respective subgroup/outcome combo), and
+then — per step 2b below — the responsible weights are those with the WIDEST GAP in WI
+between the two sensitive-attribute groups (d and d'), not a literal difference of named
+"b1/b2/c1/c2" scalars. So: use tp_s / fn_s' / tp_s' / fp_s' as the ground-truth terminology
+downstream; do not invent "b1/b2/c1/c2" labels — they do not appear in the paper.
+
+Step 2b (identifying responsible weight indices): "FairWeight identifies the responsible weights
+with the widest WI gap [25], due to different groups (d and d') from the sensitive attribute... A
+union of these weights indices is taken for further scoring. We consider these weights responsible
+for bias and misclassification, for two groups of a sensitive attribute." I.e.: compute WI vectors
+for group d and group d' (using the tp/fn/fp sample sets above), take the per-coordinate
+difference/gap between the two groups' WI, select the weights with the widest gap as
+"responsible," and union them across the sensitive-attribute groups.
+
+3.4 Coordinate-wise aggregation weightage formula (gamma1/beta1 — NOTE naming correction)
+---------------------------------------------------------------
+IMPORTANT NAMING CORRECTION vs. the task prompt: the paper's hyperparameters are named
+β1 and β2 (beta_1, beta_2) — NOT "gamma1/beta1, gamma2/beta2". There is no γ (gamma) symbol
+in this formula at all. Using the paper's actual symbols below.
+
+Step 3a — Individual (per-client) aggregation weightage, Eq. (13)... actually the plaintext
+(non-HE) formula is introduced first in Section IV.3 as (unnumbered inline formula, later restated
+as Algorithm 1 line 5):
+
+    w_ij = ( β1 · [ (n − (freq_j · w_ij)) / n ] )^{β2}
+
+where i = client index, j = position/index of the weight parameter, n = total number of
+participating clients, freq_j = frequency count of weight j being marked as "responsible for bias"
+across clients (computed via secure aggregation of client-reported indices: freq^t ← SecAgg(w_i^t)
+in Algorithm 1 line 4).
+
+Worked numeric example given in paper (3 clients, 4 weight params each):
+  w1 = [0,0,0,1], w2 = [0,1,0,1], w3 = [0,1,1,1]  (1 = identified as responsible for bias)
+  freq = [0,2,1,3]  (sum of indicator across the 3 clients, per weight position)
+  Weight param 1: freq=0 → not penalized anywhere → weightage 1 in all models.
+  Weight param 2: causes bias in models 2,3 but not 1 → incentivized in 1, penalized in 2,3.
+  Weight param 3: causes bias only in model 3 → incentivized in 1,2, penalized in 3.
+  Weight param 4: causes bias in ALL models (freq=3=n) → pruned, assigned value 0 everywhere.
+  Resulting per-client individual weightage vectors (with β1=β2=1):
+    w1 = [1, 1, 1, 0], w2 = [1, .33, 1, 0], w3 = [1, .33, .66, 0]
+  (w_32 = 0.33, w_33 = 0.66 — explained: weight param 2 responsible in 2 of 3 models so
+  penalized more strictly; weight param 3 only responsible in its own model so penalized less.)
+
+β1 role: "can be any real number in [1, n/(n−1)) because a larger number will assign a
+weightage score greater than 1 to a weight causing bias." (i.e., β1 incentivizes/boosts "honest"
+— non-biased — weight coordinates.)
+β2 role: "can be any real number greater than or equal to 1. They help decrease the weightage
+score for the responsible weights for bias and increase the remaining ones." (exponentiation —
+sharpens the penalty on responsible weights, pushes non-responsible ones up.)
+
+Step 3b — Average aggregation weightage score per client, Eq. restated as Algorithm 1 steps 6-7:
+    w_i^t_sum ← SecAgg(w_i^t)              (sum across clients, secure-aggregated)
+    w_i^t ← w_i / w_sum^t                   (normalize: average aggregation weightage score)
+
+Worked example continued (β1=β2=1): keeping the three clients' individual scores above, the
+final averaged aggregation weightage becomes:
+    w1 = [.33, .6, .37, 0], w2 = [.33, .19, .37, 0], w3 = [.33, .19, .24, 0]
+
+ALGORITHM 1 (main loop) — FairWeight: Model Interpretation based Weightage for
+Fairness-aware Aggregation, full pseudocode as given:
+  Input: global model θ^t (t=0) and θ_i^0 (local model updates, ∀i∈n), sensitive attribute x_s
+         (values s and s'), Initialise local data statistics (ds_i^t) = Acc, {Pr(A=1,Y=1), Pr(A=0,Y=1)}
+         from clients for calculating global fairness metrics using SecAgg.
+         Initialise 1 ≤ β1 < n/(n−1) and β2 ≥ 1, adjust based on application sensitivity.
+  Output: θ^{t+1} (global model for next iteration), balanced accuracy BA_g, global fairness Fair_g.
+  1. for each round t in 1,2,...,T:
+  2.   each participant i∈n trains θ_i^t, performs fairness constrained optimization locally. [Def. 3]
+  3.   each participant calculates w_i^t by identifying responsible model weights causing bias and
+       misclassification via x_s, employing model interpretation. [Fig. 2]
+  4.   freq^t ← SecAgg(w_i^t)        # clients secure-aggregate to get frequency of weight params causing bias
+  5.   w_i^t ← (β1 · (n − (freq_j^t · w_ij^t)) / n)^{β2}     # clients update aggregation weightage locally
+  6.   w_sum^t ← SecAgg(w_i^t)       # sum of aggregation weightage scores via SecAgg
+  7.   w_i^t ← w_i / w_sum^t          # clients calculate average aggregation weightage score
+  8.   θ^{t+1}, BA_g, Fair_g ← SecAgg(w_i^t · θ_i^t, ds_i^t)   # secure-agg to get global model + metrics
+  9. end for
+
+3.5 Hyperparameters and their roles — exhaustive list
+---------------------------------------------------------------
+- β1 (beta_1): domain [1, n/(n−1)); incentivizes non-responsible ("honest") weight coordinates,
+  scales weightage > 1 for bias-causing weights before the penalizing exponent is applied.
+  Default/initial value in Algorithm 1: initialised to a value in [1, n/(n−1)); used as 1 in the
+  worked numeric example; optimized online via Algorithm 3 (Appendix B) across rounds.
+- β2 (beta_2): domain ≥ 1; exponent that sharpens the penalty on bias-responsible weights and
+  boosts the remaining (non-responsible) ones. Also initialised to 1 in the worked example /
+  "β1 and β2 are initialised as 1" (Section V parameters).
+- top_fraction / "percentage of weights selected as responsible for bias": in Section V
+  (Parameters), stated as: "The number of weights selected as responsible for bias is set as 10%
+  of the total weights." This is also the swept parameter in the sensitivity study, Table VI
+  ("Weights (%)" column: values tested = 5, 10, 15, 20, 25 — see Section 4 below).
+- repeats: parameter to Algorithm 2 (WEIGHTIMPORTANCE) controlling how many times the
+  random-pruning-and-backprop pass is repeated per data point to estimate WI via sampling. The
+  paper states experiments overall were run "10 times each and reported the average result" at
+  the experiment-repetition level (Section V, Parameters: "We ran the experiments 10 times each
+  and reported the average result"), and separately that Table II results (comparison with
+  baselines) are "averaged over 10 runs with insignificant standard deviation in order of 10^-3."
+  CAVEAT: the paper does NOT state a distinct numeric value for the "repeats" parameter INSIDE
+  Algorithm 2 (the inner WI-sampling repeat count) separately from this outer 10-run experiment
+  repetition — it is plausible these refer to the same "10," but the text does not explicitly bind
+  Algorithm 2's `repeats` input to the number 10. Treat the inner-loop repeats value as UNSTATED/
+  not explicitly given, rather than assuming it equals 10.
+- k (number of weights randomly sampled/pruned in Algorithm 2, input to WEIGHTIMPORTANCE):
+  no explicit numeric value given anywhere in the paper. Not stated.
+- "max_samples": NOT a hyperparameter name used anywhere in the paper. No parameter by this
+  name, or anything evidently equivalent (e.g., a cap on samples per client used in WI
+  computation), is mentioned. This should be treated as absent from the paper — do not assume a
+  value or an equivalent exists.
+- fair_weight: not a named hyperparameter in the paper either. The closest analogues are ζ
+  (regularisation constant in Eq. 5/6, set to 100 per Section V) and the pair β1/β2 above. If an
+  implementation needs a single "fair_weight" knob, the paper's closest grounded value is ζ=100,
+  but note the paper does not call it "fair_weight."
+
+
+4. EXPERIMENTS SECTION (exhaustive)
+============================================================
+
+4.0 Headline answer to the CIFAR10 question
+---------------------------------------------------------------
+NO. This paper reports ZERO image-classification experiments and ZERO use of CIFAR10 or any
+other image dataset. All five datasets used (Adult, Bank, Default, Law, KDD) are TABULAR
+datasets with real, named sensitive/protected attributes (gender, race, age, marital status,
+education). The model architecture used throughout experiments is a small feedforward neural
+network (not a CNN) — see 4.2 below. Any CIFAR10 + synthetic proxy sensitive attribute (vehicle
+vs animal) setup in this thesis/codebase is NOT something FairWeight's authors tested; it is an
+adaptation forced by the thesis's own experimental scope, and must be documented as a deviation
+from the source paper, not as a configuration the paper itself used.
+
+4.1 Datasets (Section V, "Datasets" paragraph + per-dataset descriptions)
+---------------------------------------------------------------
+Five datasets, all tabular/structured, binary classification:
+
+1) Adult (UCI Adult / Census Income, cited [40]). Task: predict whether an individual's income
+   exceeds $50,000/year, from features including age, education, occupation, marital status.
+   Sensitive attributes: gender (67% male, 33% female) and race (85% white, 15% non-white).
+   Class imbalance: 76% earning <$50K, 24% earning >$50K. Positive:negative class ratio stated
+   as 1:3.0.
+
+2) Bank (bank marketing). Task: predict whether a client will subscribe to a term deposit, from
+   age, job, education, previous marketing interactions. Sensitive attributes: age, marital status
+   (60% married, 28% single), education level. Imbalanced: 88% of clients not subscribing.
+   Positive:negative ratio: 1:7.87.
+
+3) Default (credit card default). Task: predict whether a client will default on a credit card
+   payment, from bill balance, income, past payment history. Sensitive attributes: gender and
+   age. Imbalanced, "higher proportion of non-default cases." Positive:negative ratio: 1:3.52.
+
+4) Law (LSAC national longitudinal bar passage study, cited [41]). Task: predict whether a law
+   school applicant will pass the bar exam, from LSAT scores, undergraduate GPA, law school
+   rank. Sensitive attributes: race and gender. Positive:negative ratio: 1:3.50.
+
+5) KDD. Task: predict whether an individual's income exceeds $50,000/year, from age, education,
+   occupation (same prediction task as Adult, but "the goal field was drawn from the total person
+   income field rather than the adjusted gross income field and may, therefore, behave
+   differently"). Sensitive attributes: gender and race. Positive:negative ratio: 1:15.11 (most
+   imbalanced of the five).
+
+Data distribution across clients: "Datasets are distributed randomly or based on specific
+attributes (age for Adult, Bank, Default, and KDD; income for Law) to reflect more realistic
+situations (to ensure the presence of non-iid data)." Two distribution modes used in experiments:
+random (R) and attribute-based (Attr).
+
+4.2 Model architecture (Section V, Parameters paragraph)
+---------------------------------------------------------------
+"The model used is similar to FairTrade [12]. This is a feedforward neural network comprising
+three fully connected layers with hidden dimensions of 64 and 32, respectively. Each hidden layer
+is followed by a ReLU activation, and a final sigmoid activation is applied to produce a scalar
+output suitable for binary classification." (Not a CNN; no mention of convolutional layers,
+ResNet, or any image-model architecture anywhere in the paper.)
+
+4.3 Training / FL hyperparameters (Section V, Parameters paragraph — stated as defaults
+    "unless specified")
+---------------------------------------------------------------
+- Number of clients: 3 (default, called "C3" in some table labels; Table IV sweeps this — see 4.6)
+- Global communication rounds: 50
+- Local rounds (local epochs per round): 15
+- Data distribution: random (default); R3C = "random data distribution with 3 clients"
+- Learning rate: 0.001
+- Regularisation constraint (ζ in Eq. 5/6): 100
+- Percentage of weights selected as responsible for bias: 10% of total weights (default; swept
+  5/10/15/20/25% in Table VI)
+- β1, β2: both initialised as 1 (and then adaptively optimized per Algorithm 3 across rounds)
+- Experiments repeated 10 times each, average result reported (Table II specifically: "averaged
+  over 10 runs with insignificant standard deviation in order of 10^-3")
+- Baseline/reference implementation: "We used the implementation provided in FairTrade as
+  baseline to implement FairWeight." Code link: https://tinyurl.com/fairweight
+- Batch size: NOT STATED anywhere in the paper. Do not assume a value.
+- Optimizer (e.g. SGD/Adam) type: NOT STATED explicitly. Not specified.
+- Train/test split ratio: NOT explicitly stated as a percentage split anywhere in the paper (see
+  section 5 below — only that "FairWeight is evaluated over five real-world datasets" and the
+  class-imbalance ratios per dataset are given; no explicit train/test percentage is given).
+
+4.4 Baselines compared against (Section V, "Baselines")
+---------------------------------------------------------------
+FedAvg [42], Agnostic-Fair [28], FCFL [29], FedFB [30], FairFed [17], FairTrade [12] — six
+baselines total (FairWeight is the 7th method/row in the comparison table). Abstract states "five
+state-of-the-art fairness-aware aggregation schemes" for comparison — consistent with FedAvg
+(not itself "fairness-aware," used as a non-fairness baseline) plus the other five being the
+fairness-aware comparison set.
+
+4.5 Main results table — Table II: Comparison with baselines, R3C setting (3 random clients),
+    metrics Acc, BA (balanced accuracy), DP (demographic parity gap). Bold = best BA per dataset.
+---------------------------------------------------------------
+Columns per method: Acc | BA | DP
+
+Dataset | FedAvg (Acc,BA,DP) | Agnostic-Fair (Acc,BA,DP) | FCFL (Acc,BA,DP) | FedFB (Acc,BA,DP) | FairFed (Acc,BA,DP) | FairTrade (Acc,BA,DP) | FairWeight (Acc,BA,DP)
+
+Adult:   FedAvg 0.77/0.79/0.409 | Agnostic-Fair 0.77/0.58/0.067 | FCFL 0.8/0.61/0.092 | FedFB 0.76/0.5/0.0005 | FairFed 0.76/0.5/0.0008 | FairTrade 0.76/0.77/0.001 | FairWeight 0.71/0.75/0.01
+Bank:    FedAvg 0.87/0.79/0.076 | Agnostic-Fair 0.86/0.53/0.064 | FCFL 0.88/0.55/0.003 | FedFB 0.89/0.56/0.0006 | FairFed 0.88/0.56/0.03 | FairTrade 0.88/0.78/0.019 | FairWeight 0.85/0.83/0.011  [BA bold = FairWeight]
+Default: FedAvg 0.78/0.69/0.053 | Agnostic-Fair 0.78/0.52/0.006 | FCFL 0.8/0.61/0.008 | FedFB 0.8/0.58/0.008 | FairFed 0.79/0.58/0.026 | FairTrade 0.77/0.69/0.01 | FairWeight 0.75/0.71/0.015  [BA bold = FairWeight]
+Law:     FedAvg 0.88/0.72/0.037 | Agnostic-Fair 0.91/0.61/0.029 | FCFL 0.91/0.57/0.004 | FedFB 0.91/0.59/0.021 | FairFed 0.91/0.57/0.004 | FairTrade 0.88/0.68/0.008 | FairWeight 0.83/0.78/0.005  [BA bold = FairWeight]
+KDD:     FedAvg 0.94/0.59/0.012 | Agnostic-Fair 0.93/0.5/0.001 | FCFL 0.93/0.52/0.003 | FedFB 0.93/0.5/0.001 | FairFed 0.93/0.5/0.001 | FairTrade 0.87/0.82/0.002 [BA bold = FairTrade] | FairWeight 0.93/0.8/0.001
+
+(Verified at high zoom directly against the Table II page image: all cells above, including the
+Law row, are confirmed as printed. Note FCFL and FairFed have identical values in the Law row
+(0.91/0.57/0.004) — this is as printed in the paper, not a transcription artifact.)
+
+Paper's own narrative on Table II (verbatim-close): "All the baselines other than FedAvg and
+FairTrade have a balanced accuracy of nearly 50%. FedAvg has high balanced accuracy, but at the
+cost of poor DP. FairWeight performs significantly better in achieving a balance between BA and
+DP than FairTrade, for 3 datasets [Bank, Default, Law — where FairWeight's BA is bolded/best].
+For the law dataset, it achieves a 10% higher BA than FairTrade. However, it has a 0.02% lower
+BA for Adult and KDD datasets. This is because (1) the Adult dataset causes poor global model
+accuracy itself, and (2) KDD has an almost balanced distribution among the two groups of
+sensitive attributes and carries very little bias. Some responsible weights identified by WI might
+be causing both bias and misclassification in the scenario of class imbalance (e.g., KDD
+dataset)."
+
+4.6 Table III — Causal fairness (FACE)-constrained optimization results, 3 clients, random
+    distribution. Compares FairTrade vs FairWeight only ("Generalisability" experiment). Columns:
+    BA, DP, FACE. Bold = best BA per dataset.
+---------------------------------------------------------------
+Dataset | FairTrade (BA,DP,FACE) | FairWeight (BA,DP,FACE)
+Adult:   0.7945, 0.0913, −0.0094  |  0.721, 0.01, −0.004
+Bank:    0.806,  0.0314, 0.009    |  0.814 [bold], 0.015, −0.019
+Default: 0.6981, 0.0227, 0.0117   |  0.7 [bold], 0.017, 0.008
+Law:     0.7467, 0.0333, 0.010    |  0.773 [bold], 0.01, 0.002
+KDD:     0.8196, 0.0558, 0.011    |  0.8, 0.04, −0.008
+
+Narrative: "FairWeight achieves high BA and low DP, which makes it agnostic to fairness metric.
+FairTrade achieves high BA for Adult and KDD for reasons similar to those discussed above."
+
+4.7 Table IV — Different data distributions (random R vs attribute-based Attr) with varying
+    number of clients (C), evaluated on the LAW dataset only ("we choose the law dataset, since
+    FairTrade has a significant loss of BA over Acc on this dataset"). FairTrade vs FairWeight.
+    Columns: BA, DP, FACE. Bold = best BA per split.
+---------------------------------------------------------------
+Split   | FairTrade (BA,DP,FACE) | FairWeight (BA,DP,FACE)
+Attr3C  | 0.74, 0.003, 0.007      | 0.76 [bold], 0.003, 0.002
+R3C     | 0.76, 0.015, 0.003      | 0.78 [bold], 0.003, -0.001
+R5C     | 0.76, 0.019, 0.008      | 0.77 [bold], 0.003, 0.002
+R10C    | 0.74, 0.006, 0.018      | 0.77 [bold], 0.001, 0.003
+R15C    | 0.72, 0.020, 0.010      | 0.77 [bold], 0.001, 0.003
+
+(Attr3C = attribute-based split, 3 clients. R3C/R5C/R10C/R15C = random split with 3/5/10/15
+clients respectively.) Narrative: "In Attr3C, each client dataset has data associated with
+different categories of an attribute. FairWeight has better performance with both Attr3C and an
+increasing number of clients. Since FairTrade achieves high BA and fairness in 10 rounds and
+maintains it, these results are also reported over only 10 global communication rounds, to test
+the efficacy of FairWeight." (NOTE: this specific Table IV experiment uses 10 global rounds, NOT
+the default 50 stated in the general Parameters section — flagged explicitly as a deviation for
+this generalisability test only.)
+
+4.8 Table V — Non-IID sensitivity: varying balance rate λ (br, ratio between one class's data
+    volume and its counterpart [43]), tested λ = 0.25, 0.50, 0.75, on Bank and Law datasets, FairWeight
+    only. Columns per dataset: BA, DP, FACE. Bold = best value per fairness metric column.
+---------------------------------------------------------------
+λ     | Bank (BA, DP, FACE)          | Law (BA, DP, FACE)
+0.25  | 0.731, 0.027, −0.0012        | 0.742, 0.0022, 0.0013
+0.50  | 0.745, 0.019, 0.0019         | 0.757, 0.0021, −0.0009
+0.75  | 0.772 [bold], 0.012 [bold], 0.0005 [bold] | 0.762, 0.0011, −0.0019
+
+Narrative: "As expected, when λ increases, FairWeight consistently improves BA and DP."
+(Uses R3C setup per the table's own heading "BA, DP and FACE for FairWeight with non-IID
+partitions.")
+
+4.9 Table VI — Sensitivity to percentage of weights selected as "responsible" (the
+    top_fraction / 5/10/15/20/25% sweep), R3C setup, Bank and Law datasets, FairWeight only.
+    Columns per dataset: BA, DP, FACE. Bold = best value per column.
+---------------------------------------------------------------
+Weights(%) | Bank (BA, DP, FACE)              | Law (BA, DP, FACE)
+5          | 0.797 [bold], 0.030, −0.013      | 0.78, 0.0025, 0.0042
+10         | 0.771, 0.012 [bold], −0.006      | 0.768, 0.0021, −0.0029 [bold]
+15         | 0.774, 0.014, 0.0012 [bold]      | 0.769, 0.001 [bold], −0.007
+20         | 0.773, 0.019, −0.0069            | 0.767, 0.003, 0.003
+25         | 0.779, 0.027, −0.0067            | 0.775, 0.0029, 0.0049
+
+Narrative: "It can be seen that selecting 10-15% of the weights achieves the best fairness scores,
+with a small trade-off to balanced accuracy. Selecting more weights and then incentivising or
+penalising can cause a decrease in accuracy and an increase in bias. This is because some
+important weights for the main classification task also get penalised, thus impacting both
+accuracy and fairness."
+
+4.10 Figure 3 — Sensitivity of β1 and β2 (Acc/BA and DP) on the LAW dataset, R3C setting.
+---------------------------------------------------------------
+Described qualitatively, not as a numeric table: x-axis β1 sweeps roughly 1.0 to 1.5 (per plot
+axis). Curves for β2 values of 20, 40, 60, 80, 100 (legend markers: β2=1, 20, 40, 60, 80, 100 —
+plot legend shows a β2=1 series plus 20/40/60/80/100). Narrative: "For all values of β1, with
+increasing β2, BA and Acc decrease. DP decreases first and then tends to increase even with a
+higher value of β1 and β2, because it even penalises the good weights for classification." (Exact
+numeric curve values are not tabulated in text — only readable from the plot image; treat precise
+per-point numbers as NOT textually stated.)
+
+4.11 Computation and communication overheads (Section V, "Results and Discussion")
+---------------------------------------------------------------
+- FairTrade with 3 clients, 10 global rounds: execution time = 3 minutes.
+- FairWeight using SecAgg, 3 clients, 10 global rounds: 20 second(s) to execute.
+- FairWeight using HE (CKKS) adds overhead. Per-operation costs stated:
+    encryption: 8s
+    addition/subtraction: 1.3s
+    multiplication: 9s
+    decryption: 19s
+  "Server requires 5 additions and 5 multiplications, which adds an overhead of 51.5s to the
+  server. Each client takes approximately 27s to encrypt and decrypt. In total, it takes 152.5s,
+  which is still better than FairTrade."
+- Communication: "FairWeight requires only one communication between server and client,
+  compared to two in FairFed and many in FairTrade." (Also stated earlier in Section I: "HE-based
+  solution reduces the number of interactions between the client and the server from two in
+  FairFed [17] and many in FairTrade [12] to one in FairWeight.")
+
+4.12 Figure 4 — 3D Pareto trade-off (DP, BA, Runtime), Bank dataset, per-method annotated points
+---------------------------------------------------------------
+Exact annotated values read from plot labels (re-verified at high zoom):
+  FairTrade:      DP=0.019, BA=0.78, T=183s
+  FW-HE (FairWeight w/ homomorphic encryption): DP=0.011, BA=0.83, T=132s
+  FedFB:          DP=0.0006, BA=0.56, T=160s
+  FCFL:           DP=0.003, BA=0.55, T=135s
+  FairFed:        DP=0.03, BA=0.56, T=125s
+  FW-SecAgg (FairWeight w/ SecAgg): DP=0.011, BA=0.83, T=20s
+  Agnostic-Fair:  DP=0.064, BA=0.53, T=160s
+  FA (FedAvg):    DP=0.076, BA=0.79, T=70s
+(These are read off a 3D scatter plot's text annotations. The DP/BA figures for FW-SecAgg and
+FW-HE — 0.011 / 0.83 — match Table II's Bank row for FairWeight (BA=0.83, DP=0.011), confirming
+the reading is reliable. All values above are the plot's own printed annotations, not estimated
+positions, so confidence is high; residual risk is only in sub-pixel digit misreads for the
+smallest DP values (e.g., FedFB's 0.0006).)
+
+Narrative: "FairWeight (particularly with SecAgg) achieves an acceptable balance, lying close to
+the Pareto front by simultaneously delivering high balanced accuracy (0.83), low DP (0.011), and
+competitive runtime (20s)."
+
+
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+============================================================
+
+5.1 Privacy mechanism / secure aggregation details
+---------------------------------------------------------------
+Two interchangeable privacy-preserving aggregation options:
+(a) SecAgg (secure aggregation, cryptographic protocol, cited [21]) — server computes sums of
+    client updates without seeing individual updates. Used by default in Algorithm 1 (4 SecAgg
+    calls per round: freq, individual weightage already computed locally — actually only steps 4,
+    6, and 8 of Algorithm 1 use SecAgg, i.e., 3 SecAgg calls per round in the main algorithm as
+    written, though the HE section states "two SecAggs are required to calculate the weightage
+    score, and one is required for aggregation and global fairness metrics" = 3 total, consistent).
+(b) HE (homomorphic encryption) — specifically CKKS scheme (cited [22]), which "supports
+    arithmetic over ciphertexts" for approximate real numbers; security based on Ring Learning
+    With Errors (RLWE). HE replaces the "two SecAggs required to calculate the weightage score
+    into a single communication." Server-side HE operations given as equations 13-15 (HEAdd for
+    frequency vector, HEMult-based computation of the weightage power term, HEAdd for the sum).
+    Appendix C gives detailed HE operation definitions: Homomorphic Addition (Eq. 16), Homomorphic
+    Multiplication with relinearization (Eq. 17-18), Multiplication by Constant (Eq. 19).
+    Appendix (Theorem 1) provides an IND-CPA semantic security proof sketch for the HE scheme
+    under the semi-honest (honest-but-curious) threat model.
+
+5.2 Threat model (Section III)
+---------------------------------------------------------------
+Honest-but-curious (semi-honest) clients and server: all parties follow protocol correctly but may
+try to infer sensitive information from messages they receive. Adversary's objectives: (1) infer
+individual client data from local/global model updates; (2) identify sensitive attribute
+distributions or fairness violations among clients. Security guarantee goal: ensure fairness in the
+aggregated model despite potential data biases, while protecting privacy of each client's local
+data. Protected attributes are assumed available locally at the client side (explicitly noted as a
+limitation in the Conclusion: "FairWeight assumes that protected attributes are available locally
+at the client side. While this is reasonable in many regulated domains such as healthcare or
+finance, future work should consider representation-learning approaches that do not require
+explicit demographic information.")
+
+5.3 Train/test split methodology
+---------------------------------------------------------------
+NOT explicitly stated as a percentage or methodology (e.g., no "80/20 split" or k-fold mentioned
+anywhere in the extracted text). The paper only specifies class-imbalance ratios and how data is
+distributed ACROSS CLIENTS (randomly, or by a specific attribute per dataset — age for Adult/
+Bank/Default/KDD, income for Law), not how each client's local data is further split into train/
+test. Treat this as unstated.
+
+5.4 Architecture / modules (Section IV overview)
+---------------------------------------------------------------
+Four modular components, matching Figure 1's workflow diagram:
+(i) local fairness-constrained training module (Definition 3 / Eq. 5-6 optimization, local to each
+    client)
+(ii) weights importance estimator (Shapley-value WI via Algorithm 2)
+(iii) weightage importance estimator (the coordinate-wise β1/β2 scoring, Algorithm 1 steps 4-7)
+(iv) privacy-preserving secure aggregation module (SecAgg or HE, Algorithm 1 step 8 / Appendix C)
+
+5.5 Relationship to FairTrade [12] baseline
+---------------------------------------------------------------
+FairWeight explicitly builds its fairness-constrained optimization (Eq. 5, Eq. 6, Q-matrix Eq. 7-8)
+directly on FairTrade's formulation ("The authors in [12] define a constraint for Demographic
+Parity (DP) as..." then gives Eq. 6-8). FairWeight's model architecture ("similar to FairTrade")
+and implementation baseline ("We used the implementation provided in FairTrade as baseline to
+implement FairWeight") are both explicitly inherited from FairTrade. This means: for any detail
+FairWeight's own paper doesn't fully specify (e.g., optimizer choice, batch size, train/test split),
+the FairTrade paper/codebase (https://tinyurl.com/fairweight is given as FairWeight's own code,
+reportedly built on FairTrade's implementation) is the more likely source — but this extraction
+only covers what FairWeight's OWN paper text states; FairTrade's paper was not read as part of
+this task and nothing from it should be assumed without separately reading that paper.
+
+5.6 Known OCR/extraction uncertainty flags (for downstream caution)
+---------------------------------------------------------------
+- Table II and Figure 4 were both re-verified at high zoom directly against the source PDF page
+  images; all numeric values quoted in sections 4.5 and 4.12 above are confirmed as printed, not
+  estimated. Note FCFL and FairFed have identical Law-row values (0.91/0.57/0.004) in Table II —
+  this is as printed, not a transcription collision.
+- Figure 3's numeric curve values are not given in text at all, only qualitative trend description.
+- Algorithm 2's `repeats` and `k` parameters, and ζ's companion "budget e" in Eq. 5, have no
+  explicit numeric values stated in the paper (see Section 3.5 above) — do not invent values for
+  these in downstream YAML configs; mark them as "paper does not specify" if a config needs to
+  state where its own value came from.
+
+
+END OF EXTRACTION.

@@ -1,0 +1,708 @@
+================================================================================
+FEDFDP: FAIRNESS-AWARE FEDERATED LEARNING WITH DIFFERENTIAL PRIVACY
+Full extraction from docs/impl-papers/Fedfdp.pdf (30 pages, read cover to cover
+including appendices, references, and all tables/figures)
+================================================================================
+
+--------------------------------------------------------------------------------
+1. CITATION
+--------------------------------------------------------------------------------
+Title: FedFDP: Fairness-Aware Federated Learning with Differential Privacy
+
+Authors:
+- Xinpeng Ling (co-first author) — East China Normal University, Shanghai, China
+- Jie Fu (co-first author) — Stevens Institute of Technology, Hoboken NJ, USA
+- Kuncan Wang — Nanyang Technological University, Singapore
+- Huifa Li — East China Normal University
+- Tong Cheng — East China Normal University
+- Zhili Chen (corresponding author) — East China Normal University
+
+arXiv ID: 2402.16028v6, "[cs.CR]", dated 7 Jan 2026 on the PDF header (this is the
+arXiv v6 revision timestamp; original submission year per arXiv ID prefix is 2024).
+Venue stated in task prompt: ACNS 2026 — NOTE: the PDF itself (title page, headers,
+footers, references) does NOT state a venue/proceedings name anywhere I could find;
+it reads as an arXiv preprint. I am relaying the ACNS 2026 / arXiv 2402.16028
+identification exactly as given in the task since the PDF's own metadata doesn't
+contradict it, but the PDF text itself does not print "ACNS" anywhere.
+
+Funding acknowledgement (for context, not for configs): National Natural Science
+Foundation of China Key Program (Grant No. 62132005), Natural Science Foundation
+of Shanghai (Grant No. 22ZR1419100), CAAI-Huawei MindSpore Open Fund (Grant No.
+CAAIXSJLJJ-2022-005A).
+
+--------------------------------------------------------------------------------
+2. PROBLEM SETUP
+--------------------------------------------------------------------------------
+The paper targets "balanced performance fairness" in federated learning (FL) —
+explicitly NOT demographic/group fairness (not about protected attributes like
+gender/race). Balanced performance fairness (Definition 1, citing Li et al. [25],
+q-FFL) means: model w1 is "more fair" than model w2 if w1's performance is more
+uniform across the N client devices. The paper operationalizes this via the
+*variance of per-client loss* (not accuracy variance, which prior work [28] used);
+using loss variance lets the fairness metric be folded directly into the training
+objective for iterative optimization. The fairness metric Psi(w) is the weighted
+variance of client loss values under the globally trained model w (Eq. 2, Section
+2.1).
+
+The privacy threat model is standard central/local differential privacy (DP) for
+FL under the (epsilon, delta)-DP definition (Definition 2, Eq. 3), instantiated
+via DP-SGD (Abadi et al. [1]): per-sample gradient clipping (sensitivity control)
+plus calibrated Gaussian noise addition, analyzed under Renyi Differential Privacy
+(RDP, Mironov [32], and RDP of the sampled Gaussian mechanism, Mironov et al.
+[33]), then converted to (epsilon,delta)-DP via Lemma 1. The paper explicitly
+does NOT assume Secure Aggregation (SecAgg) — the server can observe individual
+client uploads (model updates and loss values) in the clear; DP is what protects
+against the server seeing sensitive info in those uploads. The paper states DP is
+guaranteed at "sample-level" via per-sample clipping, and notes SecAgg is
+orthogonal (could be added but isn't assumed and doesn't replace DP).
+
+The core technical problem: achieving fairness requires clients to upload extra
+information (per-client loss values) to the server, and the local loss-reweighting
+mechanism used for fairness interacts with DP's clipping/noise mechanics — both of
+which can hurt fairness, privacy budget, or model utility if not co-designed. The
+paper's contribution is a unified algorithm that co-designs (a) a fairness-aware
+local objective, (b) DP-SGD-compatible fairness-aware per-sample gradient clipping,
+and (c) an adaptive (privacy-budget-saving) clipping scheme for the uploaded loss
+values.
+
+--------------------------------------------------------------------------------
+3. ALGORITHM
+--------------------------------------------------------------------------------
+
+3A. BASE QUANTITIES (Section 2.1, Eq. 1-2)
+--------------------------------------------------------------------------------
+Global FL objective:
+    w* = argmin F(w),  F(w) = sum_{i=1}^{N} p_i * F_i(w)        (Eq. 1)
+where F_i(.) is client i's local loss function, and p_i = |D_i| / sum_j |D_j|
+(client weight proportional to local dataset size), D_i = client i's dataset.
+
+Fairness metric (weighted variance of client loss under global model w):
+    Psi(w) = sum_{i=1}^{N} p_i * (F_i(w) - F(w))^2               (Eq. 2)
+Lower Psi = fairer (more uniform per-client loss).
+
+Standard DP-SGD background given (Section 2.2, Eq. 3-5), used as the baseline
+mechanism FedFDP extends:
+    g_t^{i,j} = grad F_i(w_t^i, xi_j)                             per-sample grad
+    clipped: g_hat_t^{i,j} = g_t^{i,j} / max(1, ||g_t^{i,j}|| / C)  (Eq. 4)
+    noised batch update: g_tilde_t^i = (1/|B_i|) * (sum_j g_hat_t^{i,j} + C*sigma*N(0,I))
+                                                                    (Eq. 5)
+    C = clipping bound, sigma = noise multiplier, B_i = client i's batch.
+
+3B. FEDFAIR (Algorithm 1; Section 3; Eq. 6-9)
+--------------------------------------------------------------------------------
+Combines the FL objective (Eq. 1) with the fairness metric (Eq. 2) into one
+objective:
+    min_w H(w) = F(w) + (lambda/2) * sum_{i=1}^{N} p_i * (F_i(w) - F(w))^2   (Eq. 6)
+
+Per-client, per-round refined local objective (client i, round t):
+    min_{w_t^i} H_i(w_t^i) = F_i(w_t^i) + (lambda/2) * (F_i(w_t^i) - F(w_t^i))^2
+                                                                    (Eq. 7)
+Here F(w_t^i) = sum_{k=1}^{N} p_k F_k(w_t^k) is the PREVIOUS round's broadcast
+global loss (computed server-side from training data of round t-1, per Algorithm 1
+line 16/line 7 — footnote 4 clarifies F(w_t) != F(w_t, test data) because the
+server cannot use held-out test data to compute it; it's purely a function of
+the training losses reported by clients in the prior round). F(w_t^i) is treated
+as a CONSTANT when differentiating H_i with respect to w_t^i.
+lambda >= 0 is the fairness hyperparameter: lambda=0 recovers vanilla FL
+(FedAvg-like); lambda -> infinity makes the algorithm focus purely on fairness
+(paper notes very large lambda causes steep gradients that can prevent
+convergence — motivating the optimal-lambda derivation in Section 5).
+
+Gradient of Eq. 7 (treating F(w_t^i) as constant):
+    grad H_i(w_t^i) = (1 + lambda * Delta_i) * grad F_i(w_t^i)      (Eq. 8)
+    where Delta_i = F_i(w_t^i) - F(w_t^i)
+
+SGD update using Eq. 8:
+    w_{t+1}^i = w_t^i - eta*(1 + lambda*Delta_i)*grad F_i(w_t^i)
+              = w_t^i - eta_i * grad F_i(w_t^i)                     (Eq. 9)
+    where eta_i = eta * (1 + lambda * Delta_i)
+
+Interpretation: this is a DYNAMIC (per-client, per-batch) learning rate eta_i that
+scales the base rate eta by (1 + lambda*Delta_i) — the exact "local scaling
+factor" the task asked about. Clients whose local loss F_i exceeds the broadcast
+global loss F (i.e., underperforming clients, Delta_i > 0) get a boosted
+effective learning rate; clients doing relatively well (Delta_i < 0) get a damped
+rate — pushing the system toward uniform per-client loss.
+
+Algorithm 1 (FedFair), full procedure:
+  Input: loss function F(w), learning rate eta, fairness hyperparameter lambda,
+         batch sample ratio q, local dataset D_i.
+  Output: final trained model w_T
+  SERVER:
+    for t = 0..T-1:
+      for i = 1..N (parallel):
+        w_{t+1}^i, F_i(w_{t+1}^i) = LOCAL(w_t, F(w_t))
+      w_{t+1} = sum_i p_i * w_{t+1}^i
+      F(w_{t+1}) = sum_i p_i * F_i(w_{t+1}^i)
+    return w_T
+  LOCAL:
+    Download w_t, F(w_t); set w_t^i <- w_t
+    Split D_i into batches {B_i}
+    for batch b in {B_i}:
+      Delta_i = F_i(w_t^i, b) - F(w_t)
+      eta_i = eta * (1 + lambda * Delta_i)
+      w_t^i = w_t^i - eta_i * grad F_i(w_t^i, b)
+    w_{t+1}^i <- w_t^i; compute F_i(w_{t+1}^i)
+    return w_{t+1}^i, F_i(w_{t+1}^i)
+
+Note server broadcasts BOTH w_t and the scalar F(w_t) every round (communication
+overhead: O(d) for model params + 1 scalar — see Table 1 in Section 4).
+
+3C. FEDFDP (Algorithm 2; Section 4; Eq. 10-15)
+--------------------------------------------------------------------------------
+FedFDP = FedFair + DP. Two DP mechanisms are added: (1) fair-clipping for
+per-sample gradients (Section 4.1), (2) adaptive clipping for the uploaded loss
+value (Section 4.2). Figure 1 (page 9) gives the full pictorial flow: server
+broadcasts w_t and F(w_t); client i updates locally via "Fair-Clipping" + noise on
+gradients, and separately clips+noises its own loss before uploading; server
+aggregates both the model (weighted mean) and the loss (weighted mean) to get
+w_{t+1} and F(w_{t+1}).
+
+Per-sample expansion of the FedFair objective (needed because DP-SGD requires
+PER-SAMPLE clipping, not per-batch):
+    min_{w_t^i} H_i(w_t^i, xi_j) = F_i(w_t^i, xi_j)
+        + (lambda/2) * (F_i(w_t^i, xi_j) - F(w_t^i))^2              (Eq. 10)
+    where xi_j in B_t^i, j = 1..|B_i|, |B_i| = client i's batch size.
+
+Gradient of Eq. 10:
+    grad H_i(w_t^i, xi_j) = (1 + lambda * Delta_i^j) * grad F_i(w_t^i, xi_j)
+                                                                      (Eq. 11)
+    where Delta_i^j = F_i(w_t^i, xi_j) - F(w_t^i)     [per-SAMPLE delta, note the
+                                                        superscript j vs Eq. 8's
+                                                        per-batch Delta_i]
+
+To make this DP-SGD-compatible, the paper replaces the raw gradient in the
+descent step with the fairness-reweighted gradient of Eq. 11 and applies
+per-sample clipping to IT (not to the raw gradient), giving the full FedFDP
+local update:
+
+    w_{t+1}^i = w_t^i - (eta/|B_i|) * [ sum_{j=1}^{|B_i|} C_t^{i,j} * grad F_i(w_t^i, xi_j)
+                                         + sigma*C * N(0,I) ]        (Eq. 12)
+
+where the fair-clipping coefficient is:
+    C_t^{i,j} = min( 1 + lambda*Delta_i^j,  C / ||grad F_i(w_t^i, xi_j)|| )  (Eq. 13)
+
+This is the EXACT quantity the task asked about: "C_ij = min(1 + lambda*delta,
+C/||g_j||)" — confirmed verbatim as Eq. 13, with Delta_i^j = F_i(w_t^i,xi_j) -
+F(w_t^i) (the per-sample loss minus the broadcast global loss from the previous
+round).
+
+Interpretation given by the paper (Section 4.1, directly below Eq. 13): this is
+called a "fair-clipping" technique.
+  - When lambda = 0, Eq. 13 reduces to standard DP clipping without fairness
+    (C_t^{i,j} = min(1, C/||grad||)).
+  - For LARGE C, Eq. 13 simplifies to the first term (1 + lambda*Delta_i^j) —
+    i.e. the fairness-scaling term dominates and the clip rarely binds.
+  - For SMALL C, Eq. 13 simplifies to the second term (C/||grad||) — i.e.
+    gradients get clipped to the DP bound C regardless of fairness scaling.
+
+Fair-clipping DPSGD steps (Section 4.3 "Overall Algorithm", summarizing lines
+11-15 of Algorithm 2): compute fair-clipping bound C_t^{i,j} (Eq. 13) and
+per-sample gradient grad F_i(w_t^i, xi_j) to get processed gradient g_tilde_t^{i,j}
+= C_t^{i,j} * grad F_i(w_t^i, xi_j); add mean-0 Gaussian noise sigma*C*N(0,I) to
+the SUM of processed per-sample gradients (once per batch, not per-sample); then
+gradient-descend.
+
+ADAPTIVE LOSS-UPLOAD CLIPPING (Section 4.2, Eq. 14-15; Algorithm 2 lines 16-20)
+--------------------------------------------------------------------------------
+Motivation stated by the paper: computing Delta_i^j requires clients to upload
+F_i(w_t^i) to the server every round, which itself needs DP protection (it
+touches private training data). F_i(w_t^i) must be clipped to interval
+[0, C_l^{i,t}] then Gaussian-noised with std sigma_l * C_l^{i,t} before upload.
+Because client loss distributions are heterogeneous (non-IID), a FIXED clip bound
+is bad: too large adds excessive noise, too small aggressively clips and loses
+signal — hence an ADAPTIVE, per-client, per-round clip bound.
+
+The adaptive clipping method uses the "differentially private mean of the
+PREVIOUS round" as this round's clip bound. For client i, round t:
+
+    C_l^{i,t} = [ sum_{j=1}^{|B_i|} clip(F_i(w_{t-1}^i, xi_j)) + N(0, (C_l^{i,t-1} * sigma_l)^2) ]
+                / |B_i|                                              (Eq. 14)
+
+where:
+    clip(F_i(w_{t-1}^i, xi_j)) = min( C_l^{i,t-1}, max(0, F_i(w_{t-1}^i, xi_j)) )
+                                                                       (Eq. 15)
+
+i.e. C_l^{i,t} is a noised, averaged, clipped version of the PREVIOUS round's
+per-sample losses, using the PREVIOUS round's own clip bound C_l^{i,t-1} and
+noise multiplier sigma_l^{t-1}. The paper states this preserves DP by the
+post-processing property (since C_l^{i,t} is derived from already-DP-protected
+quantities, further use of it doesn't cost additional privacy budget).
+
+Algorithm 2 lines 17-20 (the actual loss-upload procedure per round, using the
+CURRENT round's clip bound C_l^{i,t} computed via Eq. 14-15):
+    for j = 1..|B_i|:
+      compute F_i(w_{t+1}^i, xi_j)
+      f_{i,j} = min( C_l^{i,t}, max(0, F_i(w_{t+1}^i, xi_j)) )
+    F_tilde_i(w_{t+1}^i) = (1/|B_i|) * [ sum_j f_{i,j} + sigma_l * C_l^{i,t} * N(0,I) ]
+    return w_{t+1}^i, F_tilde_i(w_{t+1}^i)
+
+This F_tilde_i(w_{t+1}^i) (DP-protected, noised, clipped loss estimate) is what's
+actually uploaded to and aggregated by the server (server computes
+F(w_{t+1}) = sum_i p_i * F_tilde_i(w_{t+1}^i), Algorithm 2 line 6), replacing the
+noiseless F_i(w_{t+1}^i) used in FedFair's Algorithm 1.
+
+FULL ALGORITHM 2 (FedFDP), as printed:
+  Input: loss function F(w), learning rate eta, noise multiplier for gradient
+         sigma, noise multiplier for loss sigma_l, fairness hyperparameter lambda,
+         batch sample ratio q, original clipping bound C.
+  Output: final trained model w_T
+  SERVER:
+    for t = 0..T-1:
+      for i = 1..N (parallel):
+        w_{t+1}^i, F_tilde_i(w_{t+1}^i) = LOCAL(w_t, F(w_t))
+      w_{t+1} = sum_i p_i * w_{t+1}^i
+      F(w_{t+1}) = sum_i p_i * F_tilde_i(w_{t+1}^i)
+    return w_T
+  LOCAL:
+    Download w_t, F(w_t); set w_t^i <- w_t
+    Sample a batch B_i randomly WITH PROBABILITY q   [Poisson sampling — this is
+                                                        the exact mechanism, "q" is
+                                                        the per-example inclusion
+                                                        probability used in the RDP
+                                                        sampled-Gaussian analysis]
+    for j = 1..|B_i|:
+      Delta_i^j = F_i(w_t^i, xi_j) - F(w_t)
+      compute C_t^{i,j} via Eq. 13
+      g_tilde_t^{i,j} = C_t^{i,j} * grad F_i(w_t^i, xi_j)
+    w_{t+1}^i = w_t^i - (eta/|B_i|) * (sum_j g_tilde_t^{i,j} + sigma*C*N(0,I))
+    compute loss clipping bound C_l^{i,t} via Eq. 14-15
+    for j = 1..|B_i|:
+      compute F_i(w_{t+1}^i, xi_j)
+      f_{i,j} = min(C_l^{i,t}, max(0, F_i(w_{t+1}^i, xi_j)))
+    F_tilde_i(w_{t+1}^i) = (1/|B_i|)*(sum_j f_{i,j} + sigma_l*C_l^{i,t}*N(0,I))
+    return w_{t+1}^i, F_tilde_i(w_{t+1}^i)
+
+OPTIMAL FAIRNESS PARAMETER lambda* (Section 5, Theorem 1 Eq. 16, Section 5.1
+Eq. 17-22)
+--------------------------------------------------------------------------------
+Theorem 1 (simplified convergence bound, full version = Theorem 5 in Appendix):
+    E[F(w_T)] - F* <= O(L*G^2*lambda^2 / (mu^2*T))
+                     + O(L^2*Gamma*lambda / (mu^2*T))
+                     + O(L*sigma^2*C^2*d / (mu^2*T*lambda))
+                     + O(L*E||w_1-w*||^2 / T)                        (Eq. 16)
+where L = smoothness constant (Assumption 1), mu = strong-convexity constant
+(Assumption 2), G = bound on per-sample gradient norm (Assumption 3), Gamma =
+heterogeneity measure (= F* - sum_i p_i F_i*, larger = more non-IID, consistent
+with Li et al. [26]'s FedAvg non-IID convergence analysis), d = model dimension.
+
+The paper shows lambda has a CONVEX influence on the convergence rate (Eq. 16:
+one term grows with lambda^2, one shrinks with 1/lambda), so there's an interior
+optimum. Section 5.1 derives this optimum analytically: assuming Delta_i^j is
+bounded (Q0 <= Delta_i^j <= Q1, so 1+Q0*lambda <= C_t^{i,j} <= 1+Q1*lambda), the
+upper bound becomes a rational function P(lambda) = (L/2muT) * (a1*lambda^3 +
+a2*lambda^2 + a3*lambda + a4)/(a5*lambda+1) (Eq. 17), with a1..a5 defined in terms
+of G, Q0, Q1, L, Gamma, sigma, C, d, ||w1-w*||^2 (full definitions on page 10).
+Minimizing via calculus (derivative F'(lambda), Eq. 18; cubic G(lambda), Eq. 19;
+discriminant argument, Eq. 20-21; depressed-cubic substitution and Cardano's
+formula, Eq. 22) yields closed-form roots x1,x2,x3 and the conclusion: G(lambda)
+has exactly one positive real root among any real roots, and lambda* =
+max_m(lambda_m) over the real roots.
+
+IMPORTANT CAVEAT (stated explicitly by the paper itself, Section 7.4 "Impact of
+Different lambda", page 18): this closed-form lambda* "relies on constants or
+upper bounds (e.g., L, mu, G, Gamma) whose specific values change with different
+models, datasets, and loss functions" — i.e., the paper does NOT give a usable
+numeric lambda* for its experiments; it only confirms empirically (Fig. 2, Section
+7.4) that an interior optimal lambda exists, by sweeping lambda and observing
+non-monotonic Psi. Do not treat lambda* as a reportable number — the paper
+provides no closed numeric value for it, only the shape of the relationship.
+
+--------------------------------------------------------------------------------
+4. EXPERIMENTS (Section 7) — EXHAUSTIVE
+--------------------------------------------------------------------------------
+
+4.1 DATASETS — VERIFIED BY READING (Section 7.1 "Tasks setting")
+--------------------------------------------------------------------------------
+The paper states explicitly: "we adopted a widely used heterogeneous settings
+[21,27] to 10 clients" and tests on THREE datasets:
+  1. MNIST [19]
+  2. FashionMNIST [40]
+  3. CIFAR10 [18]
+
+CONFIRMED: CIFAR10 IS among the datasets tested — this is NOT MNIST/FMNIST-only.
+All three datasets appear in every main results table (Tables 2-5) and in
+Figures 2-4 for FashionMNIST and CIFAR10 specifically (Table 6-7 and Fig. 5 use
+only MNIST and/or FashionMNIST for some ablations — see below for exactly which
+dataset each table/figure covers).
+
+Heterogeneity partitioning: Dirichlet distribution Dir(beta), default beta = 0.1
+(cited as a widely-used non-IID setting per [27,38]). Section 7.3 also tests
+Dir(0.5) and Dir(1) for robustness (RQ2).
+
+4.2 MODEL ARCHITECTURE
+--------------------------------------------------------------------------------
+"We use a 4-layer CNN architecture [30] which consists of two convolutional
+layers and two fully connected layers as model architecture." This single 4-layer
+CNN (2 conv + 2 FC) is used for ALL THREE datasets (MNIST, FashionMNIST, CIFAR10)
+— the paper does not describe a separate/larger architecture for CIFAR10, and
+does NOT mention ResNet anywhere in the experimental section. No further
+architecture detail (channel counts, kernel sizes, activation functions) is given
+in the paper text.
+
+4.3 IMPLEMENTATION ENVIRONMENT
+--------------------------------------------------------------------------------
+PyTorch 1.8. Hardware: one server, Intel i9-13900KS CPU (24 cores), 64GB RAM, one
+NVIDIA RTX 4090 GPU, running Windows 10.
+
+4.4 NUMBER OF CLIENTS
+--------------------------------------------------------------------------------
+Default: 10 clients (all of Tables 2-3, and the Dir(.) heterogeneity columns of
+Tables 4-5). Scalability experiments (Section 7.3, Tables 4-5, CIFAR10 only):
+also tested with 20 clients and 50 clients.
+
+4.5 HYPERPARAMETERS — DEFAULT SETTING (Section 7.1 "Hyperparameters" paragraph)
+--------------------------------------------------------------------------------
+Quoting directly:
+
+For FedFair and its baseline algorithms (non-DP):
+  - learning rate eta = 0.1
+
+For FedFDP and its (DP-ified) baseline algorithms:
+  - eta = 1.0                         [note: different from FedFair's eta=0.1]
+  - batch sample ratio q = 0.05       (this is the Poisson sampling rate in
+                                        Algorithm 2 line 10)
+  - clipping bound for gradient C = 0.1
+  - noise multiplier for gradient sigma = 2.0
+  - privacy budget epsilon = 3.52     (resulting overall (epsilon,delta)-DP, not
+                                        an input hyperparameter per se — it's the
+                                        realized budget under the other settings)
+  - delta = 1.0 x 10^-5
+  - clipping bound for loss C_l = 2.5
+  - noise multiplier for loss sigma_l = 5.0
+
+These are the DEFAULT values used for the main comparative results in Tables 2
+and 3 (Section 7.2, answering RQ1), and are reused as the baseline/default
+configuration throughout Section 7.3 (RQ2, heterogeneity/scalability) unless a
+table explicitly varies a parameter.
+
+NOTE ON "dp_steps": the paper does not use or define any hyperparameter named
+"dp_steps," "loss_clip_init" is not a literal paper term either (the paper's
+term for the analogous quantity is simply C_l, with its VALUE at round 0
+unspecified in text — Eq. 14 requires a previous-round C_l^{i,t-1} and sigma_l^{t-1}
+recursively, implying some initialization at t=0, but the paper does not state
+what C_l^{0} or sigma_l^{-1} initialize to). This is a genuine gap in the paper
+— if the codebase needs an init value for C_l at round 0, the paper does not
+specify one; do not invent one without flagging it as an implementation choice.
+
+NUMBER OF COMMUNICATION ROUNDS — VERIFIED, WITH AN IMPORTANT CORRECTION TO THE
+TASK'S PRIOR NOTE:
+--------------------------------------------------------------------------------
+The paper does NOT state a single fixed T (communication rounds) for its main
+Table 2/3 results — T is not given as one explicit number anywhere in the main
+text for the default experiments. The only place T appears explicitly is in the
+"Impact of Different sigma" paragraph (Section 7.4, page 18), which states
+sigma in {1, 1.5, 2, 2.5, 3} were tested "under the condition of epsilon = 2 and
+q = 0.05, which supports T in {6, 115, 268, 463, 708} rounds of communication" —
+i.e., T is DERIVED from the privacy budget/noise level via the RDP accountant
+(larger sigma allows more rounds T for the same epsilon budget), not set as an
+independent fixed hyperparameter. The five values given are {6, 115, 268, 463,
+708}.
+
+I could NOT find any statement of "~776 rounds" or "eval every 25 rounds"
+anywhere in this paper — neither phrase nor those numbers appear in the text I
+read (all 30 pages, including both result tables' surrounding paragraphs and the
+appendix). The closest reported number is 708 (not 776), as the max of the sigma
+ablation's T-range, under epsilon=2, not whatever epsilon the archive note may
+have been describing. If "~776 rounds, eval every 25 rounds" came from a run log
+or external note, it does NOT match anything explicitly stated in this paper's
+text — flag this as a discrepancy rather than trusting it as paper-derived. It
+is possible that number came from your own codebase's run config/notes rather
+than this paper.
+
+4.6 RESULTS TABLES — QUOTED IN FULL
+
+Table 1 (Section 7.1, page 14) — Communication Overhead Comparison:
+  Algorithm   | Comm. Cost/Round | Extra Transmitted | Description
+  FedAvg      | O(d)             | None               | model params/gradients only
+  FedProx     | O(d)             | None                | adds proximal term locally
+  q-FFL       | O(d)             | Scalar              | sends scalar loss for re-weighting
+  SCAFFOLD    | O(2d)            | Control Variates    | transmits model + control variates
+  FedDyn      | O(d)             | None                | improves SCAFFOLD w/o control variates
+  ALI-DPFL    | O(d)             | Scalar              | server broadcast scalar local steps
+  FedFDP      | O(d)             | Scalar              | transmits scalar loss for fairness/privacy
+  (d = model parameter dimension)
+
+Table 2 (page 15) — FedFair vs baselines, test accuracy (%) and fairness (Psi),
+NO DP, Dir(0.1), 10 clients, 4-layer CNN:
+  Dataset        MNIST                    FashionMNIST              CIFAR10
+  Method         Acc(%)        Psi        Acc(%)        Psi         Acc(%)        Psi
+  FedAvg         98.67+-0.09   7.3e-3     87.05+-1.02   3.6e-1      62.03+-1.00   1.1e0
+  SCAFFOLD       98.45+-0.03   3.0e-2     86.77+-0.25   6.1e0       62.21+-1.37   9.9e0
+  FedProx        98.70+-0.13   7.5e-3     87.30+-0.51   3.5e-1      62.13+-0.20   1.2e0
+  FedDyn         98.40+-0.23   8.0e-3     87.48+-0.31   6.2e-1      62.33+-1.15   3.2e0
+  q-FFL          98.72+-0.03   4.7e-3     87.35+-0.13   5.1e-1      63.33+-0.21   9.4e-1  (best Psi for CIFAR10)
+  FedFair        98.75+-0.09   3.9e-3     87.70+-0.76   2.6e-1      62.38+-0.88   8.5e-1  (best Psi overall; bold)
+
+Text claim accompanying Table 2: FedFair improves fairness "across the MNIST,
+FashionMNIST, and CIFAR10 datasets, with respective increases of 17.0%, 25.7%,
+and 9.6%" (fairness/Psi improvement percentages vs best baseline), while
+maintaining comparable accuracy.
+
+Table 3 (page 15) — FedFDP vs baselines (DP applied to all), Acc(%) and Psi, at
+FIXED privacy budget epsilon = 3.52, Dir(0.1), 10 clients, 4-layer CNN:
+  Dataset        MNIST                      FashionMNIST                CIFAR10
+  Method         Acc(%)        Psi          Acc(%)        Psi           Acc(%)        Psi
+  FedAvg         93.40+-0.47   1.1e11+-0.5e10   84.15+-1.97  3.0e8+-1.4e8   52.61+-0.17  6.1e9+-5.2e9
+  SCAFFOLD       93.95+-1.39   7.0e10+-4.9e10   83.41+-4.87  3.3e9+-4.7e9   53.85+-1.16  6.2e9+-1.3e9
+  FedProx        90.50+-3.95   5.3e10+-7.3e9    83.85+-0.98  7.9e8+-4.5e8   51.34+-0.91  4.4e9+-2.1e9
+  FedDyn         91.42+-2.25   5.6e10+-9.8e9    84.04+-1.21  8.8e8+-3.2e8   52.14+-1.39  5.5e9+-1.2e9
+  ALI-DPFL       90.89+-1.65   3.3e10+-8.3e9    83.65+-1.68  6.6e8+-3.5e8   52.05+-1.26  3.6e9+-1.6e9
+  q-FFL          93.74+-1.41   7.8e10+-1.1e11   83.13+-2.74  4.2e9+-2.6e9   48.46+-1.00  4.7e9+-1.9e9
+  FedFDP         95.13+-0.83   2.3e10+-1.0e10   85.99+-0.76  2.8e8+-0.8e8   54.21+-0.98  2.6e9+-1.6e9  (best Acc AND best Psi on all 3 datasets; bold)
+
+Text claims accompanying Table 3:
+  - DP causes accuracy drop of roughly 3%-10% vs non-DP (Table 2), and fairness
+    metric (Psi) "increases significantly in magnitude" under DP — DP
+    substantially hurts fairness.
+  - At fixed epsilon=3.52, FedFDP "achieve[s] improvements [in fairness] of
+    30.3%, 6.7%, and 27.8% across three distinct datasets, respectively" (vs
+    best baseline, for MNIST/FashionMNIST/CIFAR10 in that order) while matching
+    or exceeding best-baseline accuracy.
+
+Table 4 (page 16) — FedFair, heterogeneity (MNIST Dir(0.1)/Dir(0.5)/Dir(1),
+FashionMNIST single Dir column) and scalability (CIFAR10, 10/20/50 clients), no
+DP:
+  Heterogeneity block:
+    MNIST Dir(0.1): FedFair 98.75 / Psi 3.9e-3 (best; q-FFL best in Dir(0.5) col
+      per text, "Except for the Dir(0.5) scenario, where it falls slightly short
+      of q-FFL")
+    MNIST Dir(0.5): FedFair 98.72, Psi 1.2e-3 vs q-FFL 98.61, Psi 1.1e-3 (q-FFL
+      slightly better Psi here)
+    FashionMNIST Dir(1): FedFair 89.60, Psi 1.7e-2 (best)
+  Scalability block (CIFAR10):
+    10 clients: FedFair Acc 62.38, Psi 8.5e-1 (best)
+    20 clients: FedFair Acc 61.58, Psi 1.1e0 (best)
+    50 clients: FedFair Acc 62.90, Psi 1.5e0 (best)
+  Text: "FedFair outperforms baseline methods in accuracy while maintaining
+  significant fairness... fairness improvements of 22.0% and 50% over the best
+  baseline in Dir(0.1) and Dir(1.0), respectively" (heterogeneity); "fairness
+  improvements of 9.6%, 15.4%, and 0.01% across three client counts" (10/20/50
+  scalability).
+
+Table 5 (page 16) — FedFDP, same layout as Table 4 but WITH DP, epsilon = 3.52:
+  Heterogeneity block (MNIST/FashionMNIST):
+    MNIST Dir(0.1): FedFDP Acc 94.13, Psi 2.3e10 (best; text notes "Except for
+      the Dir(0.5) scenario, where it slightly underperforms q-FFL")
+    MNIST Dir(0.5): FedFDP Acc 94.56, Psi 3.4e9 — q-FFL at Dir(0.5): 93.86, Psi
+      2.5e8 (q-FFL's Psi is notably better here)
+    FashionMNIST Dir(1): FedFDP Acc 86.77, Psi 6.0e8 (best)
+  Scalability block (CIFAR10):
+    10 clients: FedFDP Acc 54.21, Psi 2.6e9 (best)
+    20 clients: FedFDP Acc 54.52, Psi 2.2e8 (best)
+    50 clients: FedFDP Acc 56.49, Psi 5.3e8 (text notes FedFDP "slightly lags
+      behind q-FFL in fairness" at 50 clients — q-FFL: Acc 49.83, Psi 1.1e7)
+  Text: "FedFDP shows fairness improvements of 30.3% and 18.9% over the best
+  baseline in Dir(0.1) and Dir(1.0), respectively" (heterogeneity); "fairness
+  improvements of 27.8% and 18.5% with 10 and 20 clients, respectively"
+  (scalability).
+
+Table 6 (page 18) — FedFDP vs baselines at FIXED privacy budgets epsilon in
+{1.0, 2.0, 3.0, 4.0}, FashionMNIST dataset ONLY (not CIFAR10), reporting average
+Acc(%) and Psi:
+  epsilon=1.0: FedAvg 61.68/1.1e6, SCAFFOLD 62.12/1.2e6, FedProx 61.25/1.2e6,
+    FedDyn 62.38/1.5e6, ALI-DPFL 61.78/1.1e6, q-FFL 58.99/3.6e6,
+    FedFDP 63.36/1.0e6 (best both)
+  epsilon=2.0: FedAvg 82.69/2.3e7, SCAFFOLD 82.36/2.3e7, FedProx 81.62/2.3e7,
+    FedDyn 82.43/3.1e7, ALI-DPFL 83.01/2.3e7, q-FFL 80.24/9.6e7,
+    FedFDP 83.15/2.1e7 (best both)
+  epsilon=3.0: FedAvg 84.07/3.8e8, SCAFFOLD 83.39/2.6e9, FedProx 85.32/3.8e8,
+    FedDyn 83.29/2.9e8, ALI-DPFL 84.12/3.9e8, q-FFL 82.92/5.5e8,
+    FedFDP 85.59/9.5e7 (best Psi; FedProx slightly higher Acc at 85.32 vs
+    FedFDP's 85.59 — wait, FedFDP's Acc 85.59 is actually highest; bold in
+    table is FedFDP)
+  epsilon=4.0: FedAvg 86.83/8.0e8, SCAFFOLD 85.41/5.6e8, FedProx 85.68/2.4e9,
+    FedDyn 84.51/5.2e9, ALI-DPFL 85.58/4.5e9, q-FFL 85.01/3.8e9,
+    FedFDP 86.97/3.8e8 (best both)
+  Text: "At epsilon=4, we supported a smaller noise multiplier sigma = 1.65 with
+  a similar number of iterations as at epsilon=3." Fairness improvement figures
+  given: "9.1%, 8.7%, 67.2%, and 32.1%" for epsilon = 1,2,3,4 respectively (vs
+  best baseline).
+
+Table 7 (page 19) — epsilon and Psi needed to hit FIXED target accuracies
+{80%, 85%, 90%, 95%}, MNIST dataset ONLY, Dir(0.05):
+  80%: FedAvg eps=2.43/Psi=2.10e9; SCAFFOLD 2.55/3.30e9; FedProx 3.02/1.30e9;
+       FedDyn 2.68/2.20e9; ALI-DPFL 2.85/3.10e9; q-FFL 2.68/9.80e8;
+       FedFDP 2.25/6.60e8 (best both, lowest eps AND lowest Psi)
+  85%: FedAvg 3.02/8.90e9; SCAFFOLD 3.15/1.10e10; FedProx 2.98/1.30e10;
+       FedDyn 3.55/7.80e9; ALI-DPFL 2.98/1.30e10; q-FFL 3.15/9.70e9;
+       FedFDP 2.70/1.20e9 (best both)
+  90%: FedAvg 3.45/1.30e10; SCAFFOLD 3.67/3.70e10; FedProx 4.31/5.80e10;
+       FedDyn 3.98/1.10e10; ALI-DPFL 3.67/2.30e10; q-FFL 4.12/8.80e10;
+       FedFDP 3.05/5.80e9 (best both)
+  95%: FedAvg 4.89/1.30e11; SCAFFOLD 5.32/1.10e11; FedProx 4.89/2.50e11;
+       FedDyn 5.15/3.30e11; ALI-DPFL 5.32/9.80e10; q-FFL 4.04/1.02e11;
+       FedFDP 3.77/2.80e10 (best both)
+  Text: "At the high 95% accuracy target, its [FedFDP's] epsilon (2.70 — NOTE:
+  table shows 3.77 for 95%, the text's "2.70" figure appears to actually
+  describe FedFDP's eps at the 85% row; quoting the text literally: "At the high
+  95% accuracy target, its epsilon (2.70) is lower than all other methods" —
+  this looks like a possible inconsistency/typo IN THE PAPER ITSELF between the
+  85% column value (2.70) and the 95% claim in prose; reporting both the table
+  values (authoritative) and the prose claim (as literally written) rather than
+  silently reconciling them]." At 80% target, FedFDP has lowest epsilon (2.25)
+  and lowest Psi (6.60e8) "in the entire table."
+
+Figure 2 (page 17) — Impact of different lambda in FedFDP, on FashionMNIST and
+CIFAR10 (not MNIST). FashionMNIST x-axis lambda in {1E-4, 5E-3, 1E-2, 5E-1, 1E0};
+CIFAR10 x-axis lambda in {1E-10, 1E-8, 1E-6, 1E-4, 1E-2, 1E0}. Shows accuracy and
+Psi (dual y-axis) vs lambda; non-monotonic Psi curve supports existence of
+interior-optimal lambda (confirms Section 5's theory qualitatively; no single
+numeric optimum is stated).
+
+Figure 3 (page 17) — Impact of different C (gradient clipping bound) in FedFDP,
+FashionMNIST and CIFAR10. C swept over {0.01, 0.1, 1, 5, 10} (explicit values
+stated in text, Section 7.4 "Impact of Different C"). Text: Psi reaches its
+minimum at C=1 but the model "does not converge due to excessive noise
+addition" at C=1; as C continues to increase performance deteriorates further
+(Psi increases); "When C=0.1, both accuracy and Psi achieve relatively good
+performance" — this is consistent with/explains why C=0.1 was chosen as the
+default (Section 7.1).
+
+Figure 4 (page 17) — Impact of different sigma (gradient noise multiplier) in
+FedFDP, FashionMNIST and CIFAR10. sigma in {1, 1.5, 2, 2.5, 3}, under epsilon=2,
+q=0.05, supporting T in {6, 115, 268, 463, 708} communication rounds
+respectively (as sigma increases, more rounds are affordable under the fixed
+epsilon budget). Text: larger sigma -> more training rounds -> better
+convergence, EXCEPT sigma=3 where "excessive noise hinders convergence." Smaller
+sigma: performance "relatively similar" with lower Psi; as sigma increases,
+"performance differences between models become apparent, and the Psi value
+increases."
+
+Figure 5 (page 19) — Tradeoff between privacy (epsilon) and fairness (Psi) at a
+FIXED target accuracy of 60%, on MNIST and FashionMNIST (not CIFAR10). Shows Psi
+monotonically decreasing as epsilon increases (more privacy budget -> better
+fairness), log-scale Psi axis, epsilon swept roughly 1-7. No FedFDP-specific
+numeric table given here, just the qualitative tradeoff curve (single curve per
+dataset, not multi-method comparison).
+
+4.7 BASELINE METHOD IDENTITIES (full list, Section 7.1 "Baselines")
+--------------------------------------------------------------------------------
+Six baselines, cited exactly as the paper cites them:
+  - FedAvg [30] (McMahan et al.)
+  - SCAFFOLD [17] (Karimireddy et al.)
+  - FedProx [24] (Li et al.)
+  - FedDyn [2] (Acar et al.)
+  - ALI-DPFL [28] (Ling et al. — same first author; DP-FL baseline, used ONLY in
+    the DP/FedFDP comparison, Table 3/5/6/7 — not used in the non-DP FedFair
+    comparison, Table 2/4, consistent with Table 1 which lists ALI-DPFL but not
+    in the FedFair tables)
+  - q-FFL [25] (Li et al., "Fair Resource Allocation in Federated Learning" —
+    this is the fairness baseline cited for Definition 1 / balanced performance
+    fairness)
+For FedFair comparisons: "the baseline algorithms were left unmodified" (no DP).
+For FedFDP comparisons: "DP was applied to each baseline algorithm to enable a
+fair comparison" — i.e., Tables 3/5/6/7 baselines are DP-ified versions of
+FedAvg/SCAFFOLD/FedProx/FedDyn/ALI-DPFL/q-FFL, not the vanilla versions.
+
+--------------------------------------------------------------------------------
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+--------------------------------------------------------------------------------
+
+5.1 PRIVACY GUARANTEE (Section 6, Theorems 2-4, Lemma 1)
+--------------------------------------------------------------------------------
+FedFDP provides formal (epsilon,delta)-DP, derived via RDP:
+  - Theorem 2 (Eq. 23): RDP of the model update w_T^i after T rounds of local
+    updates, R_model^i(alpha) = T/(alpha-1) * log(sum_{k=0}^alpha C(alpha,k) *
+    (1-q)^(alpha-k) * q^k * exp((k^2-k)/(2*sigma^2))), alpha>1 the RDP order.
+    (Uses the "Sampled Gaussian Mechanism" RDP result of Mironov et al. [33],
+    Definition 3, Eq. 24-26.)
+  - Theorem 3 (Eq. 27): RDP of the uploaded loss F_tilde_i(w_{t+1}^i), same
+    functional form as Theorem 2 but with sigma_l in place of sigma:
+    R_loss^i(alpha) = T/(alpha-1) * log(sum_k C(alpha,k)*(1-q)^(alpha-k)*q^k*
+    exp((k^2-k)/(2*sigma_l^2))).
+  - Theorem 4 (Eq. 28): combines model-update RDP and loss RDP SEQUENTIALLY
+    (composition, Definition 4) then converts to (epsilon,delta)-DP via Lemma 1
+    (RDP-to-DP conversion, Balle et al. [3]):
+    (epsilon^i, delta^i) = (R_model^i(alpha) + R_loss^i(alpha) + ln((alpha-1)/alpha)
+                             - (ln(delta)+ln(alpha))/(alpha-1), delta)
+    for any 0 < delta < 1.
+  - The realized experimental privacy budget reported throughout Section 7 is
+    epsilon = 3.52 at delta = 1.0e-5 (default setting), with other epsilon
+    values (1,2,3,4) explored in Table 6's ablation and epsilon as an OUTPUT
+    (not input) in Table 7's target-accuracy experiments.
+  - FedFDP explicitly does NOT assume Secure Aggregation; sample-level DP via
+    per-sample clipping is the sole protection mechanism (Section 6 opening
+    paragraph).
+
+5.2 CONVERGENCE ANALYSIS ASSUMPTIONS (Appendix A.1, used for Theorem 1/5)
+--------------------------------------------------------------------------------
+  - Assumption 1: F_1..F_N are all L-smooth.
+  - Assumption 2: F_1..F_N are all mu-strongly convex.
+  - Assumption 3: per-sample stochastic gradient norm uniformly bounded by G,
+    i.e. ||grad F_i(w_t^i, xi_j)|| <= G for all i,t,j.
+  These are standard convex-optimization assumptions for the theoretical
+  analysis; the paper's actual CNN experiments are non-convex (the assumptions
+  are a theoretical convenience for Theorem 1/5, not a claim the experiments
+  satisfy them).
+
+Theorem 5 (full, unsimplified convergence bound, Eq. 29, Appendix A.2):
+    E[F(w_t)] - F* <= (L/2t) * ( A/(mu^2*(2*C_t - 1)) + E||w_1-w*||^2 )
+  where A = G^2*C_t^3 + 3*G^2*C_t^2 + 2*L*Gamma*C_t + 2*sigma^2*C^2*d/B_hat^2,
+  B_hat = min_i |B_i| (smallest client batch size), Gamma = F* - sum_i p_i*F_i*
+  (non-IID heterogeneity measure), C_t = sum_i p_i*C_t^i, C_t^i = (1/|B_i|) *
+  sum_j C_t^{i,j} (i.e. C_t is the batch/population-average of the per-sample
+  fair-clipping coefficients). Full derivation (Lemma 2 and its proof, virtual
+  sequences v_t, w_t) spans Appendix A.2, pages 25-30 — purely theoretical, not
+  needed for config-building but included here for completeness/citation
+  accuracy.
+
+5.3 ABLATIONS CONDUCTED (Section 7.4, RQ3) — confirmed set:
+--------------------------------------------------------------------------------
+  - lambda (fairness hyperparameter): Fig. 2, FashionMNIST + CIFAR10
+  - C (gradient clipping bound): Fig. 3, FashionMNIST + CIFAR10, values swept
+    {0.01, 0.1, 1, 5, 10}
+  - sigma (gradient noise multiplier): Fig. 4, FashionMNIST + CIFAR10, values
+    swept {1, 1.5, 2, 2.5, 3}, under fixed epsilon=2, q=0.05
+  - epsilon (privacy budget) at fixed target accuracy: Table 7, MNIST only,
+    Dir(0.05), targets {80%,85%,90%,95%}
+  - epsilon at fixed accuracy=60% tradeoff with Psi: Fig. 5, MNIST + FashionMNIST
+  - epsilon swept directly {1.0,2.0,3.0,4.0}: Table 6, FashionMNIST only
+  - heterogeneity (Dir(0.1)/Dir(0.5)/Dir(1)): Tables 4-5, MNIST + FashionMNIST
+  - scalability (10/20/50 clients): Tables 4-5, CIFAR10 only
+
+5.4 LIMITATIONS STATED BY THE PAPER (Section 8, verbatim themes)
+--------------------------------------------------------------------------------
+  - Only statistical heterogeneity (non-IID data via Dirichlet) is studied; MODEL
+    heterogeneity (different client architectures/capacities) and cross-domain
+    data (differing feature spaces across clients) are NOT addressed.
+  - Assumes full client participation every round; does NOT handle stragglers,
+    device heterogeneity, unstable networks, or asynchronous updates — these are
+    named as future work, not supported by the current algorithm/experiments.
+
+5.5 RELATED WORK CONTEXT (Appendix B, brief)
+--------------------------------------------------------------------------------
+Distinguishes "group fairness" (demographic-attribute fairness, e.g. equal
+opportunity — prior DPFL works like [14,15,34,9,10,37]) from this paper's target,
+"balanced performance fairness" (uniform per-client performance, introduced by Li
+et al. [25]/q-FFL, extended by [23,42]). Paper claims to be the first to address
+balanced performance fairness specifically within DPFL (DP + FL combined).
+
+================================================================================
+SUMMARY OF KEY NUMBERS FOR CONFIG-BUILDING (FedFDP default experimental setting)
+================================================================================
+  datasets:        MNIST, FashionMNIST, CIFAR10 (confirmed, all three used)
+  model:            4-layer CNN (2 conv + 2 FC) — same arch for all 3 datasets
+  clients:          N = 10 (default); also 20, 50 (CIFAR10 scalability only)
+  partition:        Dirichlet, beta = 0.1 default (also 0.5, 1.0 tested)
+  eta (FedFair):    0.1
+  eta (FedFDP):     1.0
+  q (sample rate):  0.05
+  C (grad clip):    0.1
+  sigma (grad):     2.0
+  sigma_l (loss):   5.0
+  C_l (loss clip):  2.5
+  epsilon:          3.52 (default, at delta=1e-5); also swept {1,2,3,4}
+  delta:            1.0e-5
+  T (rounds):       NOT explicitly fixed/stated for the main default results;
+                     only known values are T in {6,115,268,463,708} tied to the
+                     sigma in {1,1.5,2,2.5,3} ablation at epsilon=2. No "~776
+                     rounds" or "eval every 25 rounds" appears anywhere in the
+                     paper text — that detail must come from elsewhere (verify
+                     against your own run logs/notes, not this paper).
+  lambda*:          no numeric value given by the paper; only a closed-form
+                     derivation whose constants (L, mu, G, Gamma) are dataset/
+                     model-dependent and not instantiated numerically anywhere
+                     in the paper. Treat as "must be tuned/estimated empirically,"
+                     per the paper's own Section 7.4 admission.
+================================================================================

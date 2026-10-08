@@ -1,0 +1,553 @@
+FedMut: Generalized Federated Learning via Stochastic Mutation
+Extraction from full PDF read (cover to cover), docs/impl-papers/FedMut - Generalized Federated Learning via Stochastic Mutation.pdf
+Extraction date: 2026-10-05
+
+================================================================================
+1. CITATION
+================================================================================
+
+Hu, Ming; Cao, Yue; Li, Anran; Li, Zhiming; Liu, Chengwei; Li, Tianlin; Chen,
+Mingsong; Liu, Yang.
+"FedMut: Generalized Federated Learning via Stochastic Mutation."
+The Thirty-Eighth AAAI Conference on Artificial Intelligence (AAAI-24), 2024.
+Pages 12528-12537.
+Affiliations: Nanyang Technological University, Singapore (authors 1,3-6,8);
+East China Normal University, China (author 7, Mingsong Chen).
+Corresponding author: Anran Li (anran.li@ntu.edu.sg).
+
+NOTE: The PDF supplied (471 KB, 10 pages: 12528-12537) contains the main paper
+body, Algorithm 1, Algorithm 2, convergence theorem statement, experiments,
+ablations, discussion, conclusion, and the full reference list. The paper text
+says "The full proof of FedMut convergence is presented in Appendix," but NO
+appendix pages/content are present in this PDF file — it ends at page 12537
+with the reference list. If a separate supplementary/appendix PDF exists it
+was not provided to this extraction; treat any appendix-only details (e.g.
+convergence proof derivation) as NOT verified here.
+
+================================================================================
+2. PROBLEM SETUP
+================================================================================
+
+Standard FedAvg-style FL dispatches the SAME global model to every client each
+round. Under non-IID client data, this tends to drive the global model into a
+sharp (poorly-generalizing) region of the loss landscape, because local
+optimization directions diverge ("gradient divergence") and FedAvg's coarse
+averaging can't resolve conflicting local updates. The paper's core empirical
+intuition (illustrated via loss-landscape plots, Fig. 1): different clients'
+loss landscapes, while not identical, tend to have flat optimal regions that
+overlap more than their sharp optimal regions do. So guiding training toward a
+flat region is more likely to generalize well across clients simultaneously.
+
+FedMut's idea: instead of sending every activated client the same global
+model, the server generates K different "mutated" versions of the global
+model (random perturbations along the model's own gradient directions,
+layer-wise, with sign +1/-1) and dispatches one distinct mutated model to each
+activated client for local training. If the global model's neighborhood lies
+within a single flat basin, all mutated models stay in that basin and their
+locally-trained versions, once re-aggregated, pull the global model toward the
+center of that flat area. If the global model is in a sharp area, mutation
+pushes some clients' starting points out of the sharp region entirely, which
+drags the aggregated model toward a flatter region over successive rounds.
+Because mutation only touches the aggregated global model (not individual
+client uploads), FedMut remains compatible with secure aggregation and needs
+no extra data or communication.
+
+================================================================================
+3. ALGORITHM
+================================================================================
+
+--- Per-round pipeline (Fig. 3, prose "Overview" section) ---
+Six steps per FL round:
+1. Model Dispatching: server sends K distinct mutated global models to K
+   activated clients (one mutated model per client).
+2. Local Training: each activated client trains its received mutated model on
+   local data.
+3. Model Uploading: clients upload trained local models to server.
+4. Model Aggregation: server aggregates the K uploaded local models into a new
+   global model (standard FedAvg-style aggregation step).
+5. Model Mutation: server mutates the newly aggregated global model, using the
+   gradient (= difference vs the PREVIOUS round's global model), to produce K
+   new mutated models for the NEXT round's dispatch.
+6. Model Updating: server replaces the stored "old global model" with the
+   current round's aggregated global model (for computing next round's
+   gradient).
+
+--- Algorithm 1 (FedMut top-level loop), as printed ---
+Input: round (# training rounds), C (set of involved clients), K (# activated
+clients per round).
+Output: w_glb (trained global model).
+
+1: w_glb^0 <- w_0                          // initialize global model
+2: w_1^mut, ..., w_K^mut <- w_glb^0        // initialize mutated models (all = initial global model, since round 1 has no gradient yet)
+3: for r = 1, ..., round do
+4:   L_c <- Randomly select K clients from C
+     /* parallel for block */
+5:   for i = 1, ..., K do
+6:     w_i^r <- LocalTraining(w_i^mut, L_c[i])
+7:   end for
+8:   w_glb^r <- ModelAggregation(w_1^r, ..., w_K^r)
+9:   [w_1^mut, ..., w_K^mut] <- ModelMutation(w_glb^r, w_glb^(r-1), K)
+10: end for
+11: return w_glb^r
+
+(Line 2 note from prose: in round 1 the server has no gradient to mutate from,
+so all K "mutated" models dispatched in round 1 are literally just the
+initial global model — mutation only kicks in from round 2 onward, once a
+gradient w_glb^r - w_glb^(r-1) exists.)
+
+--- Core mutation equation (Eq. 2) ---
+Let w_glb = {layer_1, ..., layer_L} (L layers) and g_glb = {lg_1, ..., lg_L}
+be the gradient of w_glb (= weight change of the global model relative to the
+OLD global model from the previous round, i.e. g_glb = w_glb - w_glb_old).
+
+For the i-th mutated model, first draw a per-layer mutation sign list
+L_mut^i = [v_1^i, ..., v_L^i], v_j^i in {-1, 1}. Then:
+
+    w_mut^i = { layer_1 + alpha * v_1^i * lg_1,
+                layer_2 + alpha * v_2^i * lg_2,
+                ...,
+                layer_L + alpha * v_L^i * lg_L }                    (Eq. 2)
+
+alpha is a hyperparameter controlling the distance of each mutated model from
+the global model — a higher alpha means a larger neighborhood / more
+aggressive mutation, which can guide the model toward a flatter area, but if
+alpha is too large the neighborhood may exceed the width of any flat basin
+and training fails to converge (confirmed empirically in ablations, see
+Section 4 below).
+
+--- Uniform-mean / zero-sum sign constraint (Eq. 3, Eq. 4) ---
+To keep the mutated models evenly distributed around the global model (so
+that re-aggregating them reconstructs the global model on average), the paper
+imposes:
+
+    w_glb = (1/K) * sum_{i=1}^{K} w_mut^i                                (Eq. 3)
+
+which, since alpha and lg_j are shared across all K mutated models for a
+given layer j, reduces to requiring the signs to sum to zero per layer:
+
+    sum_{i=1}^{K} v_j^i = 0        for every layer j                      (Eq. 4)
+
+In other words it is a BALANCED/uniform-mean construction by design — exactly
+half of the K sign values for each layer are +1 and half are -1 (this is a
+structural property of how the mutation signs are drawn, not a separate
+"weighted vs uniform aggregation option" choice the user can toggle; see note
+below). If K is odd, one slot is reserved: w_mut^K is simply set to w_glb
+unmutated (w_mut^K = w_glb when K mod 2 = 1), and the sign-balancing is done
+over the remaining K-1 (even) slots.
+
+NOTE ON "weighted vs uniform mean aggregation option": the paper's Eq. 3/Eq.4
+balance condition concerns the MUTATION step (ensuring mutated models average
+back to the global model), not the ModelAggregation step in Algorithm 1 line
+8. The paper does NOT explicitly discuss weighted-vs-uniform options for the
+Model Aggregation step (step 4 / line 8) in the main text — it simply says
+"the cloud server aggregates these local models to generate a new global
+model," analogous to FedAvg, without specifying weighting by local dataset
+size vs uniform/unweighted averaging. The archive config's claim of "uniform
+(unweighted) mean aggregation" is therefore NOT something this paper's text
+explicitly confirms or denies for the FedAvg-style aggregation step — it must
+be a choice made in the official FedMut code (not shown in this PDF). Flagging
+this as unverified-from-paper-text.
+
+--- Algorithm 2 (ModelMutation), as printed ---
+Input: w_glb (global model), w_glb' (old global model), K (# activated
+clients).
+Output: L_mut (list of mutated models).
+
+1:  g_glb <- w_glb - w_glb'
+2:  L_mut <- []
+3:  if K mod 2 = 1 then
+4:    L_mut <- L_mut + [w_glb]
+5:  end if
+6:  L <- number of layers of w_glb
+7:  Lv_1, Lv_2, ..., Lv_L <- [ -1,-1,...,-1 (floor(K/2) times), 1,1,...,1 (floor(K/2) times) ]
+8:  for i = 1, ..., L do
+9:    Lv_i <- Randomly shuffle the elements in Lv_i
+10:   [v_i^1, v_i^2, ..., v_i^(2*floor(K/2))] <- Lv_i
+11: end for
+12: for i = 1, ..., 2*floor(K/2) do
+13:   w_mut <- w_glb
+14:   for j = 1, ..., L do
+15:     w_mut.layer_j <- w_glb.layer_j + alpha * v_j^i * g_glb.lg_j
+16:   end for
+17:   L_mut <- L_mut + [w_mut]
+18: end for
+19: return L_mut
+
+Mechanism in words: for EACH layer independently, build a list of exactly
+2*floor(K/2) sign values, half -1 half +1, then shuffle it randomly; the i-th
+shuffled entry becomes that layer's mutation sign for the i-th mutated model.
+This per-layer independent shuffle is what produces the "mutation_signs"
+structure — each mutated model gets an independently-random pattern of
++1/-1 across layers, but across the K mutated models (for any fixed layer),
+the signs are always exactly balanced (zero-sum), satisfying Eq. 4.
+
+--- Dynamic Preference Mutation (acceleration/asymmetry schedule) ---
+This is the "mut_bound" / "mut_acc_rate" mechanism referenced by the user.
+Quoted from the paper (page 12532-12533):
+
+"Typically, since the model is far away from any optimal solution, the
+inference capacity of the global model is poor in the early stage of
+training. At this stage, our mutation strategy will focus on mutating the
+model in the direction of the gradients. In other words, we shift the
+neighborhood in the direction of the gradients. Specifically, we set the
+mutation value v in {1, -1 + beta_t} rather than {1, -1}, where beta_t is a
+hyperparameter whose value will increase with the number of training
+rounds."
+
+(Note: OCR renders this with some garbling — the printed set is {1, -1+beta_t}
+based on surrounding text; beta_t effectively biases the "-1" mutation
+direction so it's not a full -1 but a partial step, shrinking the asymmetry
+between the + and - mutation directions as training proceeds, which has the
+effect of pushing mutated models preferentially along the positive-gradient
+direction early on, accelerating convergence.)
+
+The schedule for beta_t (Eq. 5):
+
+    beta_t = max( beta_0 * (1 - t / T_b), 0 )                            (Eq. 5)
+
+where T_b is "the bound of the early training stage" — this IS the
+"mut_bound" parameter referenced by the user (called T_b / "Tb" in the paper,
+not literally named "mut_bound" in the text, but functionally identical: it
+is the round-count over which the asymmetric/accelerated mutation decays to
+zero, i.e. once t >= T_b, beta_t = 0 and mutation reverts to the symmetric
+{1,-1} sign scheme of Eq. 2/Algorithm 2). beta_0 is the INITIAL value of this
+decaying bias — this is the "mut_acc_rate" parameter referenced by the user
+(called beta_0 in the paper). As t increases from 0 to T_b, beta_t decays
+linearly from beta_0 down to 0.
+
+The paper's ablation section explicitly confirms beta_0 values used per
+model (see Section 4): "We set beta_0 = 0.3 for CNN and VGG-16, and
+beta_0 = 0.5 for ResNet-18." This directly matches the user's stated
+"mut_acc_rate 0.3 for CNN/VGG (0.5 for ResNet-18)" — just under the paper's
+own symbol beta_0 rather than the literal string "mut_acc_rate" (that name is
+presumably from the official code's variable naming, not the paper's
+notation).
+
+T_b (mut_bound) itself: the paper's main Settings/Experiments section does
+NOT explicitly state a numeric value for T_b in the main text. It is used
+symbolically in Eq. 5 and discussed qualitatively in the ablation (Fig. 6b),
+but no explicit "T_b = 50" (or any other number) statement was found anywhere
+in the paper body. The user's claim of "mut_bound 50" could NOT be verified
+from the paper text — it is presumably from the official code defaults
+(github.com/HMHelloWorld/FedMut), which this PDF-only extraction has no way
+to confirm. FLAGGING AS UNVERIFIED.
+
+--- Convergence Analysis (brief) ---
+Theorem 1 states FedMut's convergence rate is of the same order as FedAvg's
+(per Li et al. 2019 analysis), under four standard assumptions (L-smoothness,
+mu-strong-convexity, bounded stochastic-gradient variance sigma_i^2, bounded
+expected squared gradient norm G^2). The bound includes an alpha^2 term
+(from Eq. 6, ||w_mut_i,n - w_glb^n||^2 = alpha^2 * ||w_glb^n - w_glb^(n-1)||^2)
+inside the constant B = (1/K^2) sum sigma_i^2 + 6*L*Gamma + (16+32*alpha^2)*(E-1)^2*G^2,
+showing the mutation magnitude alpha enters the convergence bound but does not
+change its asymptotic order. Full derivation/proof is referenced as being in
+an Appendix NOT included in this PDF (see note in Section 1).
+
+================================================================================
+4. EXPERIMENTS — FULL HYPERPARAMETER AND RESULT EXTRACTION
+================================================================================
+
+--- 4.1 Global training settings (stated once, apply to "all the experiments") ---
+Quoted directly: "For all the experiments, we set SGD optimizer with a
+learning rate of 0.01 and a momentum of 0.9. For each FL training round, we
+set the batch size to 50 and the number epoch of each local training to 5."
+
+  - Optimizer: SGD
+  - Learning rate: 0.01
+  - Momentum: 0.9  <-- SEE MOMENTUM DISCREPANCY NOTE BELOW (user flagged 0.5)
+  - Batch size: 50
+  - Local epochs per round: 5
+  - Hardware: Ubuntu workstation, Intel i9 CPU, 64GB RAM, 2x NVIDIA RTX 4090 GPUs.
+
+*** MOMENTUM DISCREPANCY — EXPLICITLY CONFIRMED/CORRECTED ***
+The paper's ONLY stated momentum value, anywhere in the main text, is 0.9
+(Experiments > Settings, page 12533, first paragraph quoted above). I
+searched the entire PDF (including convergence analysis, ablations,
+discussion, conclusion, references) and found NO other mention of momentum,
+no mention of "0.5," and no separate statement reconciling a paper-vs-code
+discrepancy. There is no appendix in this PDF to check for a supplementary
+clarification. So:
+  - Paper TEXT says momentum = 0.9, unconditionally, for all experiments.
+  - The user's claim that "code default and what they actually used is 0.5"
+    could NOT be verified or refuted from this PDF — the paper itself says
+    nothing that supports 0.5. That claim must rest entirely on inspecting
+    the official FedMut code (github.com/HMHelloWorld/FedMut), which this
+    PDF-only extraction task did not have access to verify.
+  - RECOMMENDATION for downstream config-writing: if the archive repro config
+    was built by actually running/reading the official code (not just the
+    paper), and found momentum=0.5 hardcoded or defaulted there, treat that
+    as a deliberate "code wins over paper" call per the project's documented
+    workflow preference — but it should be flagged in any thesis prose as a
+    paper-vs-implementation discrepancy, citing the paper's Settings section
+    (which says 0.9) explicitly, since this extraction cannot confirm the
+    code value itself.
+
+--- 4.2 Datasets, models, partitioning (page 12533) ---
+Three datasets used:
+  1. CIFAR-10 (image, Krizhevsky 2009)
+  2. CIFAR-100 (image, Krizhevsky 2009)
+  3. Shakespeare (text, Caldas et al. 2018 / LEAF benchmark)
+
+Models per dataset:
+  - CIFAR-10 and CIFAR-100: three model architectures each —
+      a. CNN (cited to McMahan et al. 2017 — i.e. the FedAvg paper's CNN,
+         consistent with the archive config's "CNNCifar (LeNet-5 style, no
+         normalization layers)" description, though the paper itself does
+         not spell out the CNN's exact layer structure/normalization choices
+         in the main text — that architectural detail is NOT stated in the
+         paper and must come from the official code)
+      b. ResNet-18
+      c. VGG-16 (cited to "TorchvisionModel 2022" — i.e. torchvision's
+         standard pretrained-weights model zoo, suggesting the VGG-16/ResNet-18
+         architectures are the standard torchvision implementations, not custom)
+  - Shakespeare: LSTM model only.
+
+Data partitioning (non-IID):
+  "we adopt Dirichlet Distribution (Hsu, Qi, and Brown 2019) to divide
+  CIFAR-10 and CIFAR-100 datasets. Specifically, we set the hyperparameter d
+  for Dirichlet Distribution to 0.1, 0.5, and 1.0, respectively. Note that the
+  smaller value of d means the greater heterogeneity of the client data."
+  Plus an IID setting evaluated as a fourth condition per dataset/model combo.
+
+  IMPORTANT: this is standard Dirichlet-alpha partitioning (Hsu, Qi & Brown
+  2019 style — a single Dirichlet concentration parameter per class,
+  typically denoted alpha or beta elsewhere in FL literature but called "d"
+  here), NOT explicitly described as "noniidCase5_beta0.1" — that specific
+  label/naming does not appear anywhere in the paper. The paper only ever
+  calls it "Dirichlet Distribution" with parameter "d" (values 0.1, 0.5, 1.0).
+  The user's "noniidCase5_beta0.1" terminology is presumably from the
+  official code's partition-function naming convention, not from the paper.
+  Functionally it is plausible this is the same Dirichlet(d=0.1) condition,
+  but this cannot be confirmed from the paper text alone — flagging as
+  code-only terminology, not independently paper-verified.
+
+  For Shakespeare: "For Shakespeare dataset, we directly used the non-IID
+  settings in LEAF (Caldas et al. 2018)" — i.e. uses LEAF's built-in
+  natural-non-IID per-speaking-character split, not Dirichlet partitioning.
+
+Number of clients / participation rate / number of rounds:
+  The main Experiments/Settings section, as printed in this PDF, does NOT
+  explicitly state the total number of clients (N), the number of activated
+  clients per round (K) as a count or percentage, or the total number of FL
+  training rounds anywhere in prose. These numbers are NOT given in text form
+  in the "Settings" paragraph or the "Datasets and Models" paragraph.
+  HOWEVER, the learning-curve plots (Figure 5 and Figure 6) have x-axes
+  explicitly labeled "Round" running from 0 to 1000, which strongly implies
+  1000 total communication rounds were used for the CIFAR-10/ResNet-18
+  comparison experiments — this is a figure-axis observation, not a stated
+  number in prose, so treat "1000 rounds" as graph-evidence-only, consistent
+  with (but not textually confirming to the same certainty as) the user's
+  stated "1000 rounds."
+  The user's claims of "100 clients, 10% per round" could NOT be found
+  anywhere in the paper text, tables, or figure captions. No sentence states
+  N=100 or K=10 or a 10% activation ratio. This is UNVERIFIED from the paper
+  — presumably taken from the official code's default config, not from the
+  paper itself.
+
+--- 4.3 Mutation hyperparameters used in the main results table (page 12533-12534) ---
+Quoted: "Here, we set alpha = 4.0 for all the cases in Table 1. We set
+beta_0 = 0.3 for CNN and VGG-16, and beta_0 = 0.5 for ResNet-18."
+
+  - alpha (mutation radius/magnitude, Eq. 2): 4.0, uniformly for ALL cases in
+    Table 1 (i.e. across CIFAR-10 and CIFAR-100, all three models, all
+    heterogeneity settings). This is the "radius" parameter the user
+    referenced — CONFIRMED as alpha=4.0, matching the user's stated
+    "radius 4.0."
+  - beta_0 (dynamic preference mutation initial bias, Eq. 5): 0.3 for CNN and
+    VGG-16; 0.5 for ResNet-18. This CONFIRMS the user's "mut_acc_rate 0.3 for
+    CNN/VGG (0.5 for ResNet-18)" claim exactly, modulo naming (paper calls it
+    beta_0, not "mut_acc_rate" — that name is presumably the code's variable
+    name).
+  - T_b (mut_bound): not numerically stated anywhere in the paper text (see
+    4.2 above) — UNVERIFIED, cannot confirm the user's "50."
+
+These alpha/beta_0 values are NOT explicitly restated for the Shakespeare/LSTM
+experiment (Table 2) — the paper does not say whether alpha=4.0 and the same
+beta_0 scheme were reused for Shakespeare, or whether different values were
+used. This is a gap in the paper's reporting; flagging explicitly rather than
+assuming the CIFAR values carried over.
+
+--- 4.4 Baselines compared against ---
+  1. FedAvg (McMahan et al. 2017) — "the most classical FL method."
+  2. FedProx (Li et al. 2020) — global variable-based method; proximal-term
+     hyperparameter mu set to 0.01.
+  3. FedGen (Zhu, Hong, and Zhou 2021) — knowledge-distillation-based method;
+     "We use the same settings presented in (Zhu, Hong, and Zhou 2021)" (i.e.
+     the paper reused FedGen's own paper's hyperparameters, not separately
+     stated here).
+  4. CluSamp / ClusteredSampling (Fraboni et al. 2021) — device
+     grouping-based method; "we select the model gradient similarity as the
+     metric for clustering" (following Fraboni et al. 2021's own approach).
+
+--- 4.5 Table 1 — CIFAR-10 / CIFAR-100 Test Accuracy (%), mean +/- std ---
+(Reproduced exactly as printed; the paper does not explicitly state in the
+Table 1 caption or surrounding text that these are "last-10-round" averages
+— the mean+/-std format is given but the paper's Table 1 caption just says
+"Test accuracy comparison for both non-IID and IID scenarios using three DL
+models," with no explicit statement of HOW the mean/std was computed, e.g.
+over last-N rounds, over multiple random seeds, or both. This detail (the
+"last-10-round evaluation" convention the user asked about) is NOT stated
+anywhere in the paper text. UNVERIFIED — presumably a convention from the
+official code/experiment scripts, not documented in the paper itself.)
+
+CNN model:
+  CIFAR-10:
+    d=0.1:  FedAvg 47.93+/-3.26 | FedProx 48.21+/-3.35 | FedGen 47.57+/-2.64 | CluSamp 47.69+/-1.30 | FedMut 51.25+/-1.07
+    d=0.5:  FedAvg 54.33+/-0.50 | FedProx 54.43+/-0.94 | FedGen 53.86+/-1.03 | CluSamp 55.14+/-0.98 | FedMut 56.90+/-0.45
+    d=1.0:  FedAvg 57.00+/-0.58 | FedProx 57.00+/-0.45 | FedGen 55.85+/-0.49 | CluSamp 55.91+/-0.82 | FedMut 58.90+/-0.59
+    IID:    FedAvg 57.32+/-0.28 | FedProx 57.58+/-0.21 | FedGen 57.33+/-0.21 | CluSamp 58.06+/-0.19 | FedMut 59.70+/-0.20
+  CIFAR-100:
+    d=0.1:  FedAvg 28.98+/-0.91 | FedProx 29.18+/-0.85 | FedGen 28.17+/-1.00 | CluSamp 28.81+/-0.66 | FedMut 31.39+/-0.40
+    d=0.5:  FedAvg 32.62+/-0.73 | FedProx 32.54+/-0.78 | FedGen 32.21+/-0.39 | CluSamp 32.20+/-0.45 | FedMut 34.52+/-0.79
+    d=1.0:  FedAvg 32.77+/-0.53 | FedProx 32.98+/-0.57 | FedGen 31.71+/-0.31 | CluSamp 32.32+/-0.36 | FedMut 34.80+/-0.39
+    IID:    FedAvg 32.37+/-0.30 | FedProx 32.46+/-0.26 | FedGen 32.20+/-0.28 | CluSamp 32.05+/-0.21 | FedMut 34.51+/-0.25
+
+ResNet-18 model:
+  CIFAR-10:
+    d=0.1:  FedAvg 44.41+/-3.13 | FedProx 43.52+/-3.13 | FedGen 44.37+/-1.88 | CluSamp 43.17+/-2.82 | FedMut 55.43+/-1.95
+    d=0.5:  FedAvg 61.75+/-0.35 | FedProx 61.23+/-0.62 | FedGen 60.69+/-0.45 | CluSamp 61.45+/-0.40 | FedMut 67.89+/-0.95
+    d=1.0:  FedAvg 65.88+/-0.20 | FedProx 65.89+/-0.38 | FedGen 65.09+/-0.34 | CluSamp 65.93+/-0.26 | FedMut 70.01+/-0.18
+    IID:    FedAvg 64.08+/-0.13 | FedProx 64.10+/-0.10 | FedGen 63.84+/-0.41 | CluSamp 64.29+/-0.18 | FedMut 70.63+/-0.13
+  CIFAR-100:
+    d=0.1:  FedAvg 34.14+/-0.76 | FedProx 34.21+/-0.67 | FedGen 34.27+/-0.48 | CluSamp 33.11+/-0.65 | FedMut 37.91+/-0.35
+    d=0.5:  FedAvg 40.72+/-0.54 | FedProx 41.52+/-0.37 | FedGen 41.33+/-0.45 | CluSamp 41.63+/-0.38 | FedMut 46.66+/-0.23
+    d=1.0:  FedAvg 42.85+/-0.29 | FedProx 43.60+/-0.34 | FedGen 42.21+/-0.16 | CluSamp 43.06+/-0.33 | FedMut 47.64+/-0.20
+    IID:    FedAvg 42.58+/-0.31 | FedProx 42.41+/-0.20 | FedGen 42.13+/-0.26 | CluSamp 42.30+/-0.34 | FedMut 48.18+/-0.10
+
+VGG-16 model:
+  CIFAR-10:
+    d=0.1:  FedAvg 56.14+/-13.61 | FedProx 56.60+/-6.77 | FedGen 64.84+/-3.66 | CluSamp 60.55+/-6.63 | FedMut 68.23+/-2.29
+    d=0.5:  FedAvg 77.91+/-0.35 | FedProx 77.80+/-0.31 | FedGen 78.00+/-0.17 | CluSamp 77.68+/-0.17 | FedMut 80.03+/-0.51
+    d=1.0:  FedAvg 79.17+/-0.23 | FedProx 79.45+/-0.19 | FedGen 79.03+/-0.62 | CluSamp 79.67+/-0.67 | FedMut 81.09+/-0.38
+    IID:    FedAvg 80.20+/-0.05 | FedProx 79.98+/-0.10 | FedGen 80.00+/-0.06 | CluSamp 80.29+/-0.07 | FedMut 81.70+/-0.06
+  CIFAR-100:
+    d=0.1:  FedAvg 46.84+/-1.08 | FedProx 45.63+/-1.67 | FedGen 47.36+/-2.84 | CluSamp 46.82+/-0.85 | FedMut 50.23+/-0.65
+    d=0.5:  FedAvg 54.09+/-0.83 | FedProx 54.80+/-0.66 | FedGen 54.59+/-0.73 | CluSamp 54.36+/-0.74 | FedMut 57.28+/-0.53
+    d=1.0:  FedAvg 55.62+/-0.25 | FedProx 55.52+/-0.90 | FedGen 55.25+/-0.65 | CluSamp 55.89+/-0.55 | FedMut 57.93+/-0.36
+    IID:    FedAvg 57.42+/-0.09 | FedProx 56.74+/-0.16 | FedGen 55.98+/-0.32 | CluSamp 56.64+/-0.25 | FedMut 58.09+/-0.21
+
+Headline claim from text: "FedMut can achieve up to 11.02% accuracy
+improvements on the CIFAR-10 dataset using ResNet-18 models in d=0.1 non-IID
+scenarios" (matches Table 1: 55.43 vs FedAvg's 44.41, difference = 11.02).
+
+--- 4.6 Table 2 — Shakespeare (LSTM) Test Accuracy ---
+Single-run point values (no +/- std reported for this table):
+  FedAvg:  52.08
+  FedProx: 52.53
+  FedGen:  52.69
+  CluSamp: 49.74
+  FedMut:  55.53 (best)
+
+No heterogeneity-level breakdown is given for Shakespeare (LEAF's natural
+non-IID split is used as-is, not varied by a Dirichlet parameter).
+
+--- 4.7 Loss landscape validation (Figure 4) ---
+ResNet-18 trained on CIFAR-10, IID scenario, comparing FedAvg vs FedMut final
+models, visualized via the loss-landscape technique of Li et al. 2018
+("Visualizing the loss landscape of neural nets"). Qualitative finding: the
+FedMut-trained model sits in a visibly flatter region than the FedAvg-trained
+model (Fig 4a vs 4b — contour plots with z-axis loss values up to ~40 for
+FedAvg vs ~18 for FedMut, though these are landscape-plot magnitudes, not
+accuracy or loss-value comparisons to be read as absolute test-loss numbers).
+
+--- 4.8 Convergence curves (Figure 5) ---
+Learning curves (accuracy % vs round, 0-1000) for CIFAR-10 + ResNet-18, all
+four heterogeneity settings (d=0.1, d=0.5, d=1.0, IID), comparing FedMut vs
+the four baselines. Qualitative findings stated in text: "FedMut approach can
+converge more quickly than all the four baselines... FedMut can achieve
+higher accuracy than all the four baselines in almost all the FL rounds...
+as the level of non-IID increases, the magnitude of the learning curve rises
+and the number of rounds needed for convergence increases." (Note: "the
+magnitude of the learning curve rises" likely a wording artifact — probably
+means variance/fluctuation of the curve increases with higher non-IID
+severity, based on the visibly noisier d=0.1 subplot.)
+
+================================================================================
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+================================================================================
+
+--- 5.1 Ablation: Mutation range alpha (Figure 6a) ---
+Tested alpha in {1, 2, 3, 4, 5} (denoted "FedMut-1" through "FedMut-5" in the
+figure legend), compared against FedAvg (= FedMut with alpha=0), on CIFAR-10
+with ResNet-18 presumably (same setup as Fig 5, though the exact
+dataset/model/heterogeneity condition for Fig 6 is not explicitly restated in
+the ablation paragraph — it is reasonable to infer it's the same CIFAR-10/
+ResNet-18 setup used throughout the convergence-curve figures, but the paper
+does not explicitly re-state this for Figure 6).
+Findings: "when alpha < 5, the inference accuracy of FedMut increases with
+increasing value of alpha" (so accuracy generally improves from alpha=1 up to
+alpha=4) "because a larger value of alpha can guide FL to converge in a
+flatter area." But "when alpha = 5, FedMut cannot train a usable model... a
+too-large mutation range may cause training to be unable to find a flat
+enough area, which results in failed convergence." This directly supports
+why the main results table uses alpha=4.0 (apparently near the top of the
+usable range, just below the alpha=5 failure point).
+
+--- 5.2 Ablation: Dynamic preference mutation beta_0 (Figure 6b) ---
+Tested beta_0 in {0.0, 0.1, 0.3, 0.5, 0.7} (denoted "FedMut-0.0" through
+"FedMut-0.7"), compared against FedAvg.
+Findings: "the higher value of beta [beta_0], the faster the training
+converges... a too large value of beta may cause training to fail." (Same
+style of failure mode as alpha — there's a sweet spot, and going too far
+causes outright convergence failure rather than merely worse results.) This
+is consistent with the main-results choice of beta_0=0.3 (CNN/VGG) and 0.5
+(ResNet-18) — these fall within the tested, apparently-safe range from the
+ablation (0.1-0.5), not at the extreme (0.7).
+
+--- 5.3 Privacy / secure-aggregation compatibility ---
+"Similar to the traditional FedAvg, the mutation strategy in FedMut is based
+on the aggregated global model rather than local models. Therefore, our
+FedMut approach can directly use the secure aggregation mechanism.
+Consequently, in FedMut, the cloud server cannot obtain raw data or the local
+model of clients." — i.e. because mutation operates purely on the already-
+aggregated global model (server-side, post-aggregation), it doesn't require
+the server to see any individual client's uploaded model in the clear, so it
+composes with secure aggregation protocols (unlike, e.g., device-grouping
+methods that need per-client model access).
+
+--- 5.4 Communication overhead ---
+"Same as FedAvg, the communication overhead of FedMut only includes K models
+for dispatching and K models for uploading in each FL round. Therefore,
+FedMut is without any additional communication overhead compared to FedAvg."
+I.e., despite generating K distinct mutated models server-side, this doesn't
+increase the number of model transmissions versus vanilla FedAvg (still
+exactly K dispatches + K uploads per round) — the mutation computation itself
+is a server-side cost only, not a communication cost.
+
+--- 5.5 Compute cost discussion ---
+No explicit wall-clock, FLOPs, or training-time comparison numbers between
+FedMut and FedAvg are given anywhere in the paper. The only compute-related
+detail stated is the hardware used for all experiments (Ubuntu workstation,
+Intel i9 CPU, 64GB RAM, 2x NVIDIA RTX 4090 GPUs — see Section 4.1). No
+per-round or per-experiment runtime, nor any statement that FedMut's mutation
+step adds negligible/non-negligible server-side compute overhead, appears in
+the paper text.
+
+--- 5.6 Items explicitly requested by the user but NOT found/verifiable in the paper ---
+For traceability, consolidating every "unverified" flag raised above:
+  - Number of clients N (paper does not state 100 or any other number).
+  - Per-round participation/activation rate or count K (paper does not state
+    10% or any specific number/fraction).
+  - Total number of FL rounds as explicit prose (only inferred from Figure
+    5/6 axis range of 0-1000; not stated as a sentence anywhere).
+  - T_b / "mut_bound" numeric value (paper never gives a number for T_b,
+    e.g. no "T_b=50" anywhere in text).
+  - The partition label "noniidCase5_beta0.1" (paper only ever says
+    "Dirichlet Distribution" with parameter d in {0.1, 0.5, 1.0}; this
+    specific code-style label string does not appear in the paper).
+  - "CNNCifar (LeNet-5 style, no normalization layers)" — paper cites the CNN
+    architecture only as "(McMahan et al. 2017)" without describing its
+    layers, so "LeNet-5 style, no normalization layers" cannot be confirmed
+    from this paper; it would come from the McMahan et al. 2017 paper or the
+    official FedMut code, not from this PDF.
+  - Whether Table 1's mean +/- std is computed over the last 10 rounds of
+    evaluation specifically (paper gives no methodological statement on how
+    the mean/std in Table 1/2 was computed).
+  - Momentum = 0.5 (paper says 0.9 everywhere it states momentum; 0.5 is not
+    supported by paper text — see Section 4.1 discrepancy note).
+  - Any content from a convergence-proof Appendix (not present in this PDF).
+
+These items should be sourced from the official code repository
+(github.com/HMHelloWorld/FedMut) if precise values are needed for YAML
+configs, and any thesis prose should cite them as "per the official
+implementation" rather than attributing them to the paper itself.

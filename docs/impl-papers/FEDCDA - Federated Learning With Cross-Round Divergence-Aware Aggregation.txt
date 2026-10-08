@@ -1,0 +1,624 @@
+================================================================================
+EXTRACTION NOTE (read first)
+================================================================================
+This PDF file, as provided in the repo, contains ONLY the main body (pages 1-9)
+and the References (pages 10-12) — 12 pages total. The paper's text repeatedly
+references Appendix A, Appendix B (B.1-B.4, proofs), Appendix C ("Details are
+in the Appendix C" — polymerization/aggregation time comparison), and Appendix
+D ("broader range of hyperparameters" results), but NONE of these appendix
+pages are physically present in this PDF. Whatever appendix content exists in
+the original ICLR 2024 publication (e.g. OpenReview/arXiv version) is NOT
+available here, and nothing from it has been included below. Every section
+below reflects only what the 12 pages actually contain. Where the paper
+points to an appendix for a detail (e.g. the "practical example" in Appendix
+A, the full derivations in Appendix B, the per-round aggregation time table in
+Appendix C, the broader hyperparameter sweep in Appendix D), this is flagged
+explicitly as NOT AVAILABLE IN THIS PDF rather than guessed at.
+
+================================================================================
+1. CITATION
+================================================================================
+Haozhao Wang, Haoran Xu, Yichen Li, Yuan Xu, Ruixuan Li, Tianwei Zhang.
+"FedCDA: Federated Learning With Cross-Round Divergence-Aware Aggregation."
+Published as a conference paper at ICLR 2024.
+
+Affiliations: S-Lab, Nanyang Technological University (Wang, Zhang); Zhejiang
+University (Xu); Department of Computer Science, Huazhong University of
+Science and Technology (Li, Xu, Li). Ruixuan Li is the corresponding author.
+Haozhao Wang, Haoran Xu, and Yichen Li contributed equally.
+
+================================================================================
+2. PROBLEM SETUP / WHAT THE PAPER IS SOLVING
+================================================================================
+Standard FL aggregation (FedAvg) averages client local models from only the
+CURRENT round. Because client data is statistically heterogeneous (non-IID),
+local models trained in the same round from different clients can diverge
+substantially from one another, so the aggregated global model can end up far
+from any individual client's local optimum and lose client-specific data
+knowledge. The paper's key empirical premise is that because clients receive
+different global models in different rounds and deep neural networks are
+non-convex (multiple local optima / saddle points), a given client's local
+models across DIFFERENT rounds may actually be closer to each other (lower
+divergence) than local models from DIFFERENT clients in the SAME round.
+FedCDA exploits this: instead of aggregating only same-round local models, it
+selectively aggregates local models drawn from multiple recent rounds (a
+per-client cache of K recent local models), choosing the combination that
+minimizes cross-client divergence, so the resulting global model stays close
+to each client's own learned local optimum and better retains everyone's data
+knowledge.
+
+================================================================================
+3. ALGORITHM
+================================================================================
+
+--- Base FL objective (Eq. 1) ---
+min_w F(w) = (1/N) * sum_{n=1}^{N} F_n(w),   s.t. F_n(w) = E_{xi~D_n}[f_n(w; xi)]
+N = number of clients, D_n = data distribution of client n, f_n(w;xi) = loss
+on sample xi (or a mini-batch loss).
+
+Assumptions used throughout (stated as Assumptions 1-3):
+- Assumption 1 (L-smoothness): F_n is L-smooth with Lipschitz constant L>0,
+  i.e. ||grad F_n(w) - grad F_n(w')||_2 <= L ||w - w'||_2 for all w, w'.
+- Assumption 2 (Bounded Variance): local stochastic-gradient variance per
+  client bounded by sigma_l^2: E(||grad f_n(w) - grad F_n(w)||^2) <= sigma_l^2.
+  Global variance of gradients among clients bounded by sigma_g^2:
+  (1/N) sum_n ||grad F_n(w) - grad F(w)||^2 <= sigma_g^2.
+- Assumption 3 (Bounded Gradient): E(||grad f_n(w)||^2) <= M^2 for all w.
+
+--- Step 1: upper-bound via L-smoothness (Eq. 2) ---
+Applying Assumption 1 (L-smoothness) to each F_n gives an upper bound on the
+objective:
+F(w) = (1/N) sum_n F_n(w)
+    <= (1/N) sum_n [ F_n(w^n) + grad_{w^n} F_n(w^n)^T (w - w^n) + L ||w - w^n||_2^2 ]
+(Eq. 2)
+
+--- Step 2: the cross-round selection objective (Eq. 3) ---
+Given the set of K recent cached local models per client,
+W_t^n = {w_{t1}^n, ..., w_{tK}^n}, the server minimizes the RHS of Eq. 2 over
+BOTH the global model w AND the choice of which cached local model to use per
+client:
+min_{w in R^d, w^1 in W_t^1, ..., w^N in W_t^N}
+  (1/N) sum_n [ F_n(w^n) + grad_{w^n} F_n(w^n)^T (w - w^n) + (L/2) ||w - w^n||_2^2 ]
+(Eq. 3)
+This is strongly convex in w for any fixed combination of local models w^n.
+
+--- Closed-form global model given selected local models (Eq. 4) ---
+w = (1/N) sum_n w^n  -  (1/(LN)) sum_n grad_{w^n} F_n(w^n)
+(Eq. 4)
+So, given Eq. 4, Eq. 3 reduces to a COMBINATORIAL optimization problem over
+which cached local model w^n to pick per client (model selection), since w is
+then determined by the chosen w^n's.
+
+--- Approximation: drop the full-gradient term (Eq. 5 / Eq. 6) ---
+Computing the full gradient grad_{w^n} F_n(w^n) on each client's local
+dataset is expensive (extra computation + communication). The paper notes
+that each local model w^n tends to nearly reach a local optimum or saddle
+point w^{n,*} (especially late in local training / with many local epochs),
+so it approximates grad_{w^n} F_n(w^n) ~= 0. Problem (3) is then
+re-formulated as:
+min_{w^1 in W_t^1,...,w^N in W_t^N}  (1/N) sum_n F_n(w^n) + (L/(2N)) sum_n ||w - w^n||_2^2,
+  s.t. w = (1/N) sum_n w^n
+(Eq. 5)
+
+Equation 5 is equivalent to (via sum (x_i - xbar)^2 = sum x_i^2 - N*xbar^2):
+min_{w^1,...,w^N} (1/N) sum_n F_n(w^n) + (L/(2N)) sum_n ||w^n||_2^2 - (L/2)||w||_2^2,
+  s.t. w = (1/N) sum_n w^n
+(Eq. 6)
+
+Eq. 5 shows the selection criterion directly: pick cross-round local models
+with MINIMAL DIVERGENCE among each other, i.e. minimize
+Var(w^n) = (1/N) sum_n || w^n - wbar ||_2^2 (variance across the N selected
+local models), particularly when the F_n(w^n) loss terms are already small
+across clients. Eq. 6's form (||w^n||^2 term) lets the l2 norm of each w^n be
+cached once computed, avoiding repeated computation, reducing cost versus
+directly computing variance.
+
+--- Computational cost of brute-force selection (Proposition 1) ---
+Proposition 1: The computation complexity of solving (6) is O(K^N) and the
+memory cost is KNC, where C denotes model size. (Exponential in N — not
+affordable at scale.)
+
+--- Reduction step 1: partial-client selection (Eq. 7, Proposition 2) ---
+To reduce cost, only the P clients n in P_t that participate in the CURRENT
+round t have their cached local model selected/optimized; local models of
+non-participating clients (n in N - P_t) are FIXED to whatever was selected
+in previous rounds:
+min_{w^n in W_t^n, for all n in P_t}
+  (1/N) sum_{n in P_t} L_n(w^n)  +  (1/N) sum_{n in N - P_t} L_n(w^n) [fixed in current round]
+  - (L/2) ||w||_2^2,
+where w = (1/N) sum_{n=1}^{N} w^n and L_n(w^n) := F_n(w^n) + (L/2)||w^n||_2^2.
+(Eq. 7)
+Proposition 2: The computation complexity of solving (7) is O(K^P) and the
+memory cost is KPC. (P = number of participating clients per round, typically
+much smaller than N, e.g. the paper samples 20% of clients, so this is a
+major reduction from O(K^N).)
+
+--- Reduction step 2: batch-based (stochastic greedy) selection (Eq. 8, Proposition 3) ---
+To reduce cost further, the P participating clients are randomly grouped into
+B equal-size batches: P_t = P_t^1 ∪ ... ∪ P_t^B. Local models are selected
+batch by batch: when selecting for batch b, the local models of clients in
+batches 1..b-1 are already fixed (from this round's selection), and clients
+in batches b+1..B are excluded (not yet considered). The per-batch objective:
+
+min_{w^n in W_t^n, for all n in P_t^b}
+  1/(N - P + bP/B) * ( sum_{n in P_t^b} L_n(w^n) + sum_{n in (N-P_t) ∪ P_t^1 ∪...∪ P_t^{b-1}} L_n(w^n) )
+  - (L/2) ||w||_2^2,
+(Eq. 8)
+where the aggregated model w for this step is the average over non-
+participating clients plus the 1st-to-b-th batches of participating clients:
+w = 1/(N - P + bP/B) * sum_{n in (N-P_t)∪P_t^1∪...∪P_t^b} w^n.
+This is described as equivalent to selecting local models that are close to
+those of clients participating in previous rounds, maintaining memory of
+their data.
+Proposition 3: The computation complexity of solving (8) is O(B K^{P/B}) and
+the memory cost is KPC.
+
+Practical control knobs noted in text: P/B can be held roughly constant to
+keep complexity manageable; in the extreme, setting B = P makes complexity
+LINEAR in K. The paper states experiments show even a small K (e.g. K=3)
+gives satisfactory performance. Memory cost KPC is called manageable because
+P is usually a small fraction of total clients and local models of non-
+participating clients can be stored on disk (paper gives the illustrative
+aside that a 1TB hard drive could store ~20,000 copies of ResNet-18).
+
+--- Why no auxiliary/proxy dataset is needed ---
+Unlike weight-setting methods (e.g. FedLAW) or ensemble-distillation methods
+(e.g. FedDF, FedGEN) which may require an additional public/proxy dataset or
+gradient descent / bipartite matching at the server, FedCDA's approach does
+not depend on an auxiliary public dataset and does not introduce higher
+computational complexity than existing methods.
+
+--- Algorithm 1: FedCDA Algorithm (full pseudocode as given) ---
+Input: Number of cached local models K, number of subsets B, learning rate
+eta, number of sampling clients P, and total communication rounds T.
+Output: Converged global model w.
+
+1: Initialize the model parameter w_0;
+2: Distribute w_0 to all clients;
+3: for each communication round t in {1, 2, ..., T} do
+4:    Randomly select a set of clients P_t;
+5:    for each selected client n in P_t in parallel do
+6:        Initialize the local model with the received global model: w^n = w_t;
+7:        Solve the local problem by updating w_n for E local mini-batch SGD
+          steps and accumulate the local loss F_n(w^n) in the last local
+          epoch: w^n = w^n - eta * grad_{w^n} f_n(w^n);
+8:    Update the cached set W_t^n for n in P_t by replacing the oldest model
+       with received w^n;
+9:    Select local models w^n for each client n in P_t by solving problem (8);
+10:   Aggregate both selected and fixed local models to obtain:
+       w_{t+1} = (1/N) sum_{n=1}^{N} w^n;
+       return global model w_T
+
+Text clarifies: FedCDA differs from FedAvg primarily in lines 9 and 10. When
+it receives local models from a subset of clients, the server updates its
+cached local models (line 8/9 of narrative numbering — replacing the oldest
+round's local model with the most recently received one), then selects local
+models for aggregation by solving problem (8) (line 9/10). The final global
+model is obtained by AVERAGING both the newly selected local models (for
+participating clients) and the fixed cached local models (for non-
+participating clients) — this is a simple average over all N clients'
+(selected or fixed) local models: w_{t+1} = (1/N) sum_{n=1}^{N} w^n.
+
+--- Warmup period ---
+"In practice, we usually apply FedCDA after a warmup training stage using
+FedAvg or other baselines to ensure that the local models can approach the
+convergence during the local training process." This is because the
+approximation grad_{w^n}F_n(w^n) ~= 0 (used to go from Eq. 3 to Eq. 5) is
+only good once local models are near convergence; using it on not-yet-
+converged early-round local models is noted to potentially hurt training
+(see Section 4/Experiments: Figure 4, "Warmup Analysis" discussed below).
+
+--- Note on orthogonal techniques ---
+The paper notes most existing methods also employ improved techniques "over
+the step of line 11" [sic; likely refers to the final aggregation step], e.g.
+re-setting aggregation weights (FedLAW) or ensemble distillation (FedDF,
+FedGEN), and states these are ORTHOGONAL to FedCDA (i.e., could in principle
+be combined, but FedCDA itself does not do server-side re-weighting or
+distillation — it uses plain averaging over selected/fixed local models).
+
+================================================================================
+4. EXPERIMENTS (exhaustive — all hyperparameters / dataset details stated in the PDF)
+================================================================================
+
+--- 4.1 Datasets used ---
+Exact quote: "We consider three popular datasets in experiments: Fashion-
+MNIST (Xiao et al., 2017), CIFAR-10 (Krizhevsky et al., 2009) and CIFAR-100
+(Krizhevsky et al., 2009), which contains 10, 10, 100 classes respectively."
+
+YES — CIFAR-10 IS used in this paper's experiments (along with Fashion-MNIST
+and CIFAR-100).
+
+--- 4.2 Models / architectures ---
+Exact quote: "For CIFAR-10 and CIFAR-100 datasets, we use ResNet-18 (He et
+al., 2016) as the backbone to train and test the performance while for
+Fashion-MNIST we use a simple CNN instead. The simple CNN has two 5x5
+convolution layers (the first with 32 channels, the second with 64, each
+followed with 2x2 max pooling), a fully connected layer with 512 units and
+ReLu activation, and a final fully output connected layer."
+
+So: CIFAR-10 -> ResNet-18. CIFAR-100 -> ResNet-18. Fashion-MNIST -> the
+simple CNN described above (not used for CIFAR datasets).
+
+--- 4.3 Data partitioning (non-IID) ---
+Two non-IID partition schemes are used, both applied across datasets:
+1. Shards (McMahan et al., 2017a): "the sorted samples are shuffled into
+   N * S shards, and assigned to N clients randomly. Each client owns an
+   equal number of pieces." S values tested: {2, 4, 8} (per Table 1 column
+   headers: Shards (S) = 2, 4, 8).
+2. Dirichlet (Lin et al., 2020): "data distribution over clients satisfies
+   the Dirichlet distribution by using alpha to characterize the degree of
+   heterogeneity. We set alpha of Dirichlet: {0.1, 0.3, 0.5}" (per Table 1
+   column headers: Dirichlet(alpha) = 0.1, 0.3, 0.5).
+
+--- 4.4 Baselines compared against ---
+- FedAvg (McMahan et al., 2017a) — base method.
+- "Efficient FL approaches" / local-process or LR-tuning methods:
+  FedProx (Li et al., 2020), FedExP (Jhunjhunwala et al., 2023), FedSAM
+  (Qu et al., 2022).
+- Aggregation-category baselines, three sub-types:
+  - Ensemble distillation: FedDF (Lin et al., 2020), FedGEN (Chen & Chao,
+    2021).
+  - Model fusion: FedMA (Wang et al., 2020a), GAMF (Liu et al., 2022).
+  - Weight setting: FedLAW (Li et al., 2023).
+
+--- 4.5 Main experimental implementation details (Section 6.1, "Implementation") ---
+Exact quote / stated values:
+- Simulation environment: PyTorch 2.0, 8 NVIDIA GeForce RTX 3090 GPUs.
+- Total clients: 20 ("We implement the whole experiment in a simulation
+  environment... We set 20 clients in total").
+- Client participation rate: "randomly choose 20% each round for local
+  training" (i.e., P = 4 of 20 clients per round).
+- Local epochs: 20 ("We set the local epoch to 20").
+- Batch size: 64 ("batch size to 64").
+- Learning rate: 1e-3 ("learning rate to 1e-3").
+- Optimizer: SGD with momentum of 1e-4 and weight decay of 1e-5, "for all
+  methods and datasets."
+- Total communication rounds: 200 ("we set the number of global
+  communication rounds to 200").
+- Repetitions / reporting: "Each experiment setting is run twice and we take
+  each run's final 10 rounds' accuracy and calculate the average value and
+  standard variance." (i.e., 2 runs, average of last 10 rounds' accuracy per
+  run, mean ± std reported.)
+- FedCDA-specific hyperparameters used in the main experiments:
+  - Memory size per client K = 3 ("we also need to set the memory size of
+    the client K to 3").
+  - Number of batches B = 3 ("batch number B to 3").
+  - Number of warmup rounds = 50 ("the number of warmup rounds to 50").
+  - Smoothness constant L = 1 for all clients ("we simply assume L = 1 for
+    all clients to save the computation cost").
+
+--- 4.6 Table 1: Main results — test accuracy (%), mean ± std ---
+"Table 1: The comparison of test accuracy of different methods. The best
+results are bolded." Two blocks: Shards (S) and Dirichlet (alpha), each with
+three datasets (Fashion-MNIST, CIFAR-10, CIFAR-100) and three settings each.
+
+SHARDS (S) block — columns are S = 2, 4, 8 for each of Fashion-MNIST,
+CIFAR-10, CIFAR-100:
+
+Fashion-MNIST(%), Shards:
+  S=2        S=4        S=8
+FedAvg:   64.69±5.62  74.78±4.55  76.81±3.33
+FedProx:  64.21±4.11  70.76±3.89  72.19±4.16
+FedExP:   65.24±3.47  69.31±4.62  76.07±0.09  [note: column 3 value as printed: 76.07±0.09]
+FedSAM:   59.28±0.15  75.19±0.10  76.07±0.10
+FedDF:    64.72±2.21  74.16±1.52  85.51±0.95
+FedGEN:   63.50±3.27  69.42±4.09  80.17±4.71
+FedMA:    64.71±4.92  74.98±5.05  77.13±4.10
+GAMF:     64.97±3.93  75.21±4.05  77.34±3.78
+FedLAW:   60.34±4.39  73.93±4.91  77.53±3.52
+Ours (FedCDA): 66.30±0.07  76.59±0.25  78.99±0.13
+
+CIFAR-10(%), Shards:
+  S=2        S=4        S=8
+FedAvg:   28.10±3.96  59.83±2.94  70.87±1.91
+FedProx:  26.39±4.16  53.03±2.29  70.91±1.37
+FedExP:   26.84±4.75  59.31±3.61  69.53±1.94
+FedSAM:   29.31±0.32  57.12±0.08  61.56±0.01
+FedDF:    32.37±2.39  60.08±5.67  71.52±2.67
+FedGEN:   27.21±3.12  57.16±2.71  68.93±1.75
+FedMA:    28.61±1.39  70.91±0.96  70.91±1.22   [note: Fed MA columns as printed]
+GAMF:     28.92±1.52  60.23±1.93  71.44±1.75
+FedLAW:   26.32±2.60  46.81±3.61  61.08±2.61
+Ours (FedCDA): 34.97±0.31  62.81±0.28  72.04±0.23
+
+CIFAR-100(%), Shards:
+  S=2        S=4        S=8
+FedAvg:   11.86±1.19  15.87±1.00  21.91±0.55
+FedProx:  10.87±0.58  15.37±0.46  24.16±0.35
+FedExP:   11.59±0.81  16.47±0.69  23.58±1.36
+FedSAM:   11.19±0.16  15.95±0.15  22.44±0.16
+FedDF:    11.63±0.67  17.13±1.25  25.84±1.02
+FedGEN:   10.07±0.19  15.26±0.29  21.49±0.17
+FedMA:    11.89±0.57  15.90±0.92  22.02±0.82
+GAMF:     11.98±0.99  16.76±0.77  24.15±0.49
+FedLAW:   11.57±0.61  15.99±0.49  22.37±0.68
+Ours (FedCDA): 12.20±0.13  19.98±0.25  28.16±0.30
+
+DIRICHLET (alpha) block — columns are alpha = 0.1, 0.3, 0.5 for each of
+Fashion-MNIST, CIFAR-10, CIFAR-100:
+
+Fashion-MNIST(%), Dirichlet:
+  a=0.1      a=0.3      a=0.5
+FedAvg:   71.81±5.61  75.97±3.21  79.73±1.94
+FedProx:  70.44±3.87  72.17±4.10  75.24±2.19
+FedExP:   73.42±4.22  58.98±5.91  61.64±1.92
+FedSAM:   71.65±0.07  75.91±0.06  77.67±0.10
+FedDF:    80.03±1.04  84.42±0.62  86.84±1.93
+FedGEN:   73.02±1.87  77.48±3.50  81.76±4.21
+FedMA:    71.87±4.84  75.89±4.13  80.12±3.53
+GAMF:     72.11±5.16  76.24±3.67  80.55±2.06
+FedLAW:   71.93±8.23  76.88±2.80  79.98±1.09
+Ours (FedCDA): 78.63±0.14  84.67±0.12  87.01±0.09
+
+CIFAR-10(%), Dirichlet:
+  a=0.1      a=0.3      a=0.5
+FedAvg:   50.43±1.68  61.11±2.68  67.37±1.69
+FedProx:  38.98±5.91  61.64±1.92  70.16±2.03
+FedExP:   60.63±4.32  70.22±2.40  74.37±1.91
+FedSAM:   49.96±0.20  59.53±0.19  64.54±0.21
+FedDF:    54.28±2.39  69.85±0.67  73.76±2.67
+FedGEN:   47.09±3.12  64.90±2.71  68.74±1.95
+FedMA:    49.98±2.01  61.32±2.17  68.42±1.95
+GAMF:     31.12±0.69  37.26±0.78  41.25±0.74
+FedLAW:   48.91±3.59  61.50±2.29  67.08±1.75
+Ours (FedCDA): 62.46±0.22  70.27±0.29  74.96±0.17
+
+CIFAR-100(%), Dirichlet:
+  a=0.1      a=0.3      a=0.5
+FedAvg:   30.13±0.70  35.73±0.56  38.86±0.35
+FedProx:  32.96±1.18  40.81±0.41  42.53±0.48
+FedExP:   36.76±1.18  44.18±0.53  47.80±0.58
+FedSAM:   21.54±0.12  24.72±0.18  28.59±0.19
+FedDF:    34.76±0.67  39.42±1.17  42.31±1.02
+FedGEN:   29.02±0.19  38.54±0.49  40.81±0.33
+FedMA:    30.02±0.38  36.21±0.83  39.55±0.52
+GAMF:     31.12±0.69  37.26±0.78  41.25±0.74
+FedLAW:   32.01±0.61  38.80±0.21  40.11±0.17
+Ours (FedCDA): 39.38±0.25  45.86±0.21  49.31±0.22
+
+[Transcription caveat: some cells in the printed table have unusual repeated
+values across columns for a given row (e.g. FedExP Fashion-MNIST S=4/S=8
+both showing 76.07±..., FedMA CIFAR-10 S=4/S=8 both 70.91±...; GAMF
+CIFAR-100 Dirichlet row duplicating the GAMF Shards-style numbers). These are
+transcribed exactly as rendered in the PDF table; they may be an artifact of
+the PDF's own typesetting/OCR rather than a transcription error on my part,
+but I am not able to verify against the authors' source data. Treat any
+visually-suspicious repeated cell with caution if it matters for a specific
+config — re-check against the PDF table image at page 8 if precision on a
+single baseline cell (not FedCDA's own numbers) is critical.]
+
+Key figures FedCDA's own row (which is what matters most for this
+implementation) are consistent and distinct across all cells and were
+read with high confidence: Shards Fashion-MNIST 66.30/76.59/78.99; Shards
+CIFAR-10 34.97/62.81/72.04; Shards CIFAR-100 12.20/19.98/28.16; Dirichlet
+Fashion-MNIST 78.63/84.67/87.01; Dirichlet CIFAR-10 62.46/70.27/74.96;
+Dirichlet CIFAR-100 39.38/45.86/49.31.
+
+Narrative callout tied to Table 1 (verbatim-paraphrased): "on relatively
+larger datasets such as CIFAR-10 Dirichlet 0.1, FedCDA with ResNet-18
+achieves 62.46% accuracy whereas the best baseline method FedExP achieves
+60.63% accuracy." [Note: the text says FedExP achieves 60.63%, which matches
+the FedExP CIFAR-10 Dirichlet a=0.1 cell in Table 1 above (60.63±4.32).]
+Also: "FedCDA with simple CNN also makes improvements on relatively smaller
+datasets [Fashion-MNIST], although the improvement is less than in large
+models." And: "the results of our method on relatively small datasets and
+simple CNN are not the best" in some cases, attributed to cross-round local
+models being more similar on small datasets/simple models, giving less room
+for cross-round aggregation to help. Conclusion drawn: "FedCDA makes more
+improvements on the large model and complex datasets."
+
+--- 4.7 Table 2: Results of FL with 100 clients (different hyperparameter regime) ---
+Section "More Comparison Results with Different Hyperparameters":
+Exact stated settings for this experiment:
+- Number of clients: 100.
+- Sample ratio: 10% (per round).
+- Learning rate: 0.1.
+- Weight decay: 1e-3 [quote: "the weight decay being 1e-3" — note, read
+  carefully: paper says "The learning rate is set to 0.1 with the weight
+  decay being 1e-3" for this experiment].
+- Local epochs: 5.
+- Optimizer: SGD WITHOUT momentum ("The local optimizer is SGD without
+  momentum").
+- Model/dataset: ResNet-18 on CIFAR-100.
+- Partitioning: Dirichlet, alpha in {0.1, 0.3, 0.5} (table columns
+  Dir(0.1), Dir(0.3), Dir(0.5)).
+- FedCDA-specific hyperparameters (K, B, warmup, L) for this particular
+  Table 2 experiment are NOT explicitly restated in the text — the surrounding
+  prose only gives the general FL hyperparameters listed above. NOT
+  AVAILABLE IN THIS PDF whether K=3/B=3/warmup=50/L=1 were reused unchanged
+  for this 100-client experiment or altered; the paper does not say.
+
+Table 2 results (Results of FL with 100 clients, CIFAR-100, ResNet-18):
+Method        Dir(0.1)      Dir(0.3)      Dir(0.5)
+FedAvg:       38.89±0.45%   40.38±0.55%   42.23±0.30%
+FedProx:      39.86±0.49%   39.48±0.51%   40.18±0.46%
+FedExP:       38.04±0.37%   44.10%±1.69%  41.79±1.62%  [as printed]
+FedSAM:       16.35±0.23%   20.53±0.24%   25.70±0.26%
+FedDF:        41.04±0.57%   47.06±1.41%   47.65±0.55%
+FedGEN:       39.91±1.72%   41.65±1.65%   43.39±1.08%
+FedMA:        39.12±0.52%   40.42±0.61%   42.89±0.21%
+GAMF:         38.99±0.61%   40.98±0.52%   43.25±0.46%
+FedLAW:       40.88±0.66%   41.77±0.46%   41.89±0.34%
+Ours (FedCDA): 47.38±0.23%  49.96±0.21%   50.04±0.19%
+
+Narrative callout: "when the data is the most heterogeneous, i.e., with
+Dirichlet alpha = 0.1, FedCDA achieves the accuracy of 47.38% which
+outperforms the best baseline method FedDF by 6.34%." (47.38 - 41.04 = 6.34,
+consistent with the table.)
+
+--- 4.8 Different Aggregation Strategies experiment (Figure 2a) ---
+Exact stated settings: CIFAR-10 dataset, 10 clients sampled each round
+(sample ratio 0.3 — text says "we only sample 10 clients in each round,
+where the sample ratio is 0.3"), client memory size K = 3. Compares FedAvg
+against 4 strategies: "newest" (only newest local model per client
+aggregated), "random" (randomly select one of the K cached models per
+client), "approximate" (= solving Eq. 8, the batch-greedy method actually
+used by FedCDA), and "optimal" (= solving Eq. 3 exactly, exponential cost,
+only feasible because they limited to 10 sampled clients for this ablation).
+Backbone: ResNet-18. Partitioning: CIFAR-10 Dirichlet (alpha sweep per
+Figure 2a, values 0.1/0.3/0.5 per the earlier Table 1 Dirichlet columns).
+Finding: approximate and optimal strategies substantially beat FedAvg,
+newest, and random — "almost a 10% increase over FedAvg" at peak. Approximate
+achieves about the same final accuracy as optimal, but converges much faster
+(fewer computations), since approximate is a greedy algorithmic approximation
+of the optimal solution.
+
+--- 4.9 Hyperparameter sensitivity: memory size K (Figure 2b) ---
+Compares test accuracy for client memory size K in {1, 2, 3, 4} on CIFAR-10
+Dirichlet(alpha=0.1). Finding: accuracy increases as K increases ("the
+increase of K value gives cross-round polymerization more choices and
+possibilities").
+
+--- 4.10 Local-epoch sensitivity: FedCDA vs FedAvg (Figure 2c / Figure 2d, "Figure 3: Impact of Batch") ---
+[Note: Figure numbering in the text narrative ("Figure 2(c)", "Figure 2(d)")
+does not exactly match the caption printed under the plot image, which reads
+"Figure 3: Impact of Batch" — this appears to be a captioning
+inconsistency/error in the source PDF itself (the plot shows local-epoch
+curves per its own panel labels "(c) Local ep.s (FedCDA)" and "(d) Local
+ep.s (FedAvg)", for FedCDA and FedAvg respectively, not batch count). Both
+labels are reproduced here as printed; treat the "Figure 3: Impact of Batch"
+caption as likely a labeling artifact in the PDF rather than a separate
+experiment, since the panel sub-captions clearly describe local-epoch
+sweeps.]
+Setup: compares local epochs (not explicitly stated which values beyond what
+appears in the plot legend: ep=10, 20, 25(?), 30, 40 are referenced in the
+legend text visible in the figure — exact legend values from the image:
+"local epoch=10", "local epoch=20", "local epoch=30", "local epoch=40" for
+panel (d); panel (c) shows curves for several K values, not epochs, per its
+legend "k=1","k=2","k=3","k=4" — NOTE: the on-page legend for panel (c)
+actually reads k=1/2/3/4 similar to Fig 2b, so panel (c)'s caption "Local
+ep.s (FedCDA)" vs its legend content (k values) appears inconsistent in the
+source; I am reporting exactly what is printed without resolving the
+discrepancy, since I cannot verify intent.)
+Finding (text): FedCDA's final converged accuracy increases with more local
+epochs while FedAvg's final accuracy stays roughly unchanged. Text states
+"This proves that our algorithm can tolerate large local interactions to
+save communication cost." Also: FedCDA's convergence curve is more stable
+(less oscillatory) than FedAvg's, attributed to FedCDA excluding the
+negative impact of client sampling that FedAvg cannot exclude.
+
+--- 4.11 Effect of Batch Number B (Section/Figure labeled "6.2" in text — likely a cross-reference typo for the batch-number figure) ---
+Exact stated setup: 50 clients, 10 sampled clients per round, CIFAR-10
+Dirichlet(alpha=0.1). Compares batch number B in {1,2,3,4,5,6,7}. Finding:
+"different batch numbers have little effect on the final precision result,"
+and results stay close to the "optimal selection" accuracy across all B
+values tested.
+
+--- 4.12 Warmup Analysis (Figure 4: Impact of Warmup) ---
+Exact stated setup: CIFAR-10, 20 clients, sample ratio 0.2. Warmup rounds
+swept per the figure legend: values visible in legend are warmup=30, 60, 90
+(or similar — legend text includes "warmup=30","warmup=60","warmup=90" not
+fully legible beyond that), up through warmup=100, 150, 200 explicitly named
+in the narrative text ("FedCDA with no warmup rounds is worse than some with
+warmup rounds... outperforms FedAvg (warmup=200)... FL with 150 warmup
+rounds has worse performance than 100 warmup rounds").
+Findings (verbatim-paraphrased):
+- FedCDA with NO warmup is worse than FedCDA WITH warmup, because local
+  models in early rounds haven't converged, and combining not-well-converged
+  local models from old rounds can hurt global-model training (described as
+  "similar to FedAvg in the startup training stages").
+- FedCDA's advantage over FedAvg grows as training proceeds, eventually
+  outperforming FedAvg at warmup=200.
+- There is a threshold for raising warmup: warmup=150 performs WORSE than
+  warmup=100. Explanation given: once local models and the global model have
+  both approached convergence in late training, the difference between local
+  models in different rounds shrinks, so combining them (the whole point of
+  FedCDA) yields little additional benefit — i.e. too much warmup erodes the
+  cross-round diversity FedCDA relies on.
+(Note: the MAIN Table 1/Table 2 experiments used warmup=50, per Section 6.1;
+this Figure-4 warmup sweep is a separate ablation, and the paper does not
+explicitly restate which warmup value, if any, is "best overall" beyond the
+100 vs. 150 comparison and the "outperforms FedAvg at warmup=200" comparison
+point.)
+
+================================================================================
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+================================================================================
+
+--- Theoretical results (stated, proofs NOT available — Appendix B not in PDF) ---
+- Theorem 1 (Approximation Selection Error): defines w^{n,*} as the local
+  optimum closest to w_t^n, and D = max over all clients/rounds/cache-slot
+  pairs of the distance between any two close cached local models. If
+  ||w_t^n - w^{n,*}|| <= epsilon for a constant epsilon, then the gap in
+  global loss between aggregating via the Eq. 5 approximation vs. the exact
+  Eq. 3 objective is bounded: epsilon_gap <= 4*L*epsilon^2 + 2*L*D*epsilon.
+  Implication stated: the approximation error shrinks as local models get
+  more converged, i.e. with more local iterations or longer warmup — this is
+  said to be verified by Figure 2(c) and Figure 4 (the Warmup figure,
+  referenced in text as "Figure 6.2").
+- Theorem 2 (Impact of Divergence of Local Optima): under strong convexity
+  of F_n with parameter mu in the region spanning cached local optima to the
+  global model, and assuming local loss is equal at local optima across
+  rounds (F_n(w_t^{n,*}) = F_n(w_{t'}^{n,*})), IF the divergence among
+  selected local models is small enough — Var(w_t^{n,*}) <= (mu/L) *
+  Var(w_t^n) - (mu/L + 1) * epsilon^2 — THEN the global loss using the
+  selected cross-round global model w_{t*} is lower than using the plain
+  t-th-round global model w_t: F(w_{t*}) <= F(w_t). Paper notes this
+  motivates why FedCDA may especially favor LARGE/overparameterized models,
+  where local optima across clients can coincide (near-zero local loss), and
+  states Table 1 results corroborate this (bigger improvement on larger
+  models).
+- Theorem 3 (Convergence on Non-convex Functions): under Assumptions 1-3 and
+  learning rate eta satisfying 0 < eta <= 1/(LE) [E = local steps/epochs],
+  the global model solved via Eq. 3 achieves asymptotic convergence:
+  (1/T) * sum_{t=1}^{T} ||grad F(w_{t*})||_2^2 = O(1/sqrt(T)).
+  Proof sketch only (full derivation in Appendix B.4, NOT in this PDF): shown
+  by (a) bounding the loss gap between w_{t*} (from Eq. 3) and the reference
+  global model w_t (plain aggregation of newest local models), then (b)
+  showing w_t's loss converges, which transitively gives convergence for
+  w_{t*}.
+- Full proofs for Theorems 1-3 are stated to be in "Appendix B.1" / "B.2" /
+  "B.4" respectively — NOT AVAILABLE IN THIS PDF.
+
+--- Appendix references not resolvable from this PDF ---
+- "A practical example is in Appendix A." — NOT AVAILABLE IN THIS PDF.
+- "The results with a broader range of hyperparameters can be found in
+  Appendix D." — NOT AVAILABLE IN THIS PDF. (So beyond Table 1, Table 2, and
+  the K/B/warmup/aggregation-strategy ablations described in Section 6.2
+  above, no further hyperparameter sweep data is available from this file.)
+- "We also compare the average polymerization time of each round of these
+  aggregation strategies. Details are in the Appendix C." — i.e. a
+  compute/wall-clock cost comparison across aggregation strategies (FedAvg,
+  newest, random, approximate, optimal) exists in the paper but the actual
+  numbers/table are NOT AVAILABLE IN THIS PDF.
+
+--- Compute/communication cost discussion (from main body, Section 4 "Methodology") ---
+- Complexity progression: brute-force Eq. 6 is O(K^N) (Prop. 1) -> partial-
+  client restriction Eq. 7 is O(K^P) (Prop. 2) -> batch-based Eq. 8 is
+  O(B*K^(P/B)) (Prop. 3). Memory cost is O(KNC) for Prop.1, then O(KPC) for
+  Props. 2 and 3 (C = model size/parameter count).
+  practical knob: keep P/B roughly constant, or set B=P for linear-in-K cost.
+- Memory/storage framing: "the memory cost KPC is also manageable because K
+  is small, because the number of sampled clients P is usually a small ratio
+  of the total clients... local models of non-participated clients can be
+  stored on disk which has sufficient storage space. For example, a 1TB hard
+  drive can store approximately 20,000 copies of ResNet-18... we believe the
+  cost is within the budget of the aggregation node which is typically hosted
+  by a cloud."
+- FedCDA is explicitly said NOT to require an auxiliary/proxy public dataset
+  (unlike FedLAW, which needs a proxy dataset for learning aggregation
+  weights, or FedDF/FedGEN-style ensemble distillation, which typically need
+  an unlabeled proxy dataset or generated data). FedCDA also does not require
+  server-side gradient descent (as FedLAW/FedGEN use) or solving a maximum
+  bipartite-matching problem (as FedMA-style model-fusion methods use),
+  keeping its computational overhead comparable to existing methods.
+
+--- Conclusion / stated limitation (Section 7) ---
+The paper's conclusion restates: FedCDA selectively aggregates cross-round
+models with minimum divergence; an approximation selection algorithm is
+introduced for efficiency; convergence is proven theoretically, and empirical
+results outperform SOTA baselines.
+Stated limitation/future work: "This paper addresses the ideal scenario
+where smoothness value [L] is equal among clients. The goal is to improve
+our method for cases with varying smoothness by refining objectives and
+incorporating sharpness in cross-round aggregation, as we currently treat
+all local models equally without considering the sharpness of their local
+optima, despite flatter optima often correlating with better
+generalization." — i.e., current FedCDA (and this extraction's Algorithm 1)
+assumes a SINGLE SHARED L across all clients (L=1 was used in experiments),
+not per-client smoothness; this is an explicitly acknowledged simplification/
+limitation, not a hidden detail.
+
+================================================================================
+END OF EXTRACTION
+================================================================================

@@ -1,0 +1,604 @@
+===============================================================================
+FCFL: A Fairness Compensation-based Federated Learning Scheme with
+Accumulated Queues
+===============================================================================
+
+1. CITATION
+-------------------------------------------------------------------------------
+Authors: Lingfu Wang (1), Zuobin Xiong (2), Guangchun Luo (1), Wei Li (3),
+         Aiguo Chen (4) [corresponding author, agchen@uestc.edu.cn]
+
+Affiliations:
+  (1) School of Information and Software Engineering, University of
+      Electronic Science and Technology of China, Chengdu, China
+  (2) Department of Computer Science, University of Nevada-Las Vegas,
+      Las Vegas, USA
+  (3) Department of Computer Science, Georgia State University, Georgia, USA
+  (4) Institute of Intelligent Computing, University of Electronic Science
+      and Technology of China, Chengdu, China
+
+Venue: ECML-PKDD 2024 (European Conference on Machine Learning and
+       Principles and Practice of Knowledge Discovery in Databases)
+       — venue identity confirmed by the user's prompt; the PDF itself
+       (as extracted) shows page headers "L. Wang et al." / paper title,
+       page numbers 386-402, and does not show an explicit venue line on
+       the pages read. Page numbering (386-402) is consistent with a
+       proceedings chapter.
+Year: 2024
+Title: "FCFL: A Fairness Compensation-based Federated Learning Scheme with
+       Accumulated Queues"
+Source code: https://github.com/wlffffff/FCFL (as stated in the abstract)
+Acknowledgments: U.S. National Science Foundation grants No. 2011845 and
+       2343619.
+Disclosure: Authors declare no competing interests.
+
+Keywords (as given): Federated learning, Performance fairness, Data
+heterogeneity, Client selection, Weighting strategy.
+
+
+2. PROBLEM SETUP / WHAT THE PAPER IS SOLVING
+-------------------------------------------------------------------------------
+The paper targets "performance fairness" in Federated Learning (FL): the
+global model, once trained, can have very different accuracy across
+different clients because client local data is heterogeneous (non-IID).
+The paper's own definition (Definition 1, attributed to Li et al. [11],
+i.e. the q-FedAvg paper):
+
+  "Definition 1. (Fairness of performance distribution [11]). A model θ1
+  is said to be fairer than θ2 if the accuracy of θ1 on the N clients
+  {a1, a2, ..., aN} is more uniform than that of θ2 on the N clients."
+
+The paper operationalizes this fairness notion as the VARIANCE of
+per-client test accuracy across all clients (lower variance = fairer),
+while also wanting to maintain a similar/competitive average accuracy.
+
+Why plain FedAvg fails at this: FedAvg aggregates client models using a
+weighted average based on the amount of local training data [15]. Under
+heterogeneous (non-IID) data, this causes significant differences in
+per-client model accuracy. The paper also argues that the standard
+practice of selecting clients for each round based on the amount of
+local data (or random selection) biases the global model toward
+clients with more/majority data, further disadvantaging "vulnerable
+clients" (clients with small or unusual/minority local data
+distributions) — client selection itself is overlooked by prior fairness
+reweighting work (q-FedAvg, FedFa, DRFL, etc.), which only reweight
+aggregation but do not address *which* clients get selected to
+participate each round. FCFL explicitly targets this gap by linking
+BOTH client selection and aggregation reweighting to a single mechanism:
+accumulated unfairness queues.
+
+
+3. ALGORITHM — EXACT UPDATE RULES AS WRITTEN IN THE PAPER
+-------------------------------------------------------------------------------
+
+3.1 Unfairness estimate uf_i^t — Eq. (1)
+
+  uf_i^t = { Acc~^t - Acc_i^t ,   if Acc~^t > Acc_i^t
+           { 0,                   otherwise
+
+  where:
+  - Acc_i^t is the evaluated LOCAL accuracy of client i in round t
+    (i.e., accuracy of the current global model θ^t evaluated on client
+    i's own local data).
+  - Acc~^t (written in the paper with a tilde over "Acc", estimated
+    global accuracy) = sum_{i=1}^{m} ω_i^t * Acc~_i^t  — i.e. the
+    ESTIMATED global model accuracy in round t, computed as the
+    aggregation-weight-weighted sum of each selected client's local
+    training accuracy Acc~_i^t (tilde), where m is the number of
+    selected clients.
+  - The paper explicitly notes: the server does NOT have access to
+    validation data in this setting (realistic assumption), so the
+    "global" accuracy used here is only an ESTIMATE, not a true
+    held-out evaluation.
+  - uf_i^t is described as "the unfairness level of client i in round
+    t, which is a cumulative value that reflects whether client i has
+    been treated fairly or not so far" — NOTE: despite this wording in
+    the prose, Eq. (1) itself defines uf_i^t as a PER-ROUND
+    (non-cumulative) quantity — the clipped (non-negative) gap between
+    the estimated global accuracy and client i's own local accuracy for
+    round t. The cumulative aspect is carried by the separate queue
+    Q_i(t) in Eq. (2), not by uf_i^t itself. (This is exactly as the
+    paper writes it — flagging the apparent terminology tension rather
+    than resolving it, since the paper does not resolve it either.)
+
+3.2 Queue update Q_i(t) — Eq. (2)
+
+  Q_i(t) = max{ Q_i(t-1) + α * uf_i^t - ω_i^t · 1_[x_i(t-1)=1] ,  0 }
+
+  where:
+  - x_i(t-1) ∈ {0,1} indicates whether client i was selected in round
+    (t-1) (1 = yes, 0 = no).
+  - 1_[condition] is an indicator function (1 if condition true, else 0).
+  - α is a hyper-parameter that controls fairness (the paper calls it
+    "a hyper-parameter that controls fairness").
+  - ω_i^t is the aggregation weight of client i in round t (defined in
+    Eq. 3 below) — used here as the "penalty" subtracted off when the
+    client WAS selected in the previous round.
+
+  Design rationale, quoted/paraphrased directly from the paper (Section
+  3.3), to "facilitate vulnerable clients":
+  - For clients with LOW ACCURACY: Q_i(t) is a cumulative value
+    reflecting overall unfairness level each round.
+  - For clients who are NOT SELECTED: the indicator 1_[condition] is 0,
+    so they get the full unfairness increment α·uf_i^t added with no
+    offsetting penalty term.
+  - For clients with SMALL WEIGHT: the cumulative value gets only a
+    small penalty (-ω_i^t), resulting in a relatively high Q_i(t).
+
+  I.e., a client who has not been treated fairly (low-accuracy, not
+  selected, or given small weight) will end up with a higher Q_i(t).
+
+3.3 Aggregation weight ω_i^{t+1} derived from Q_i(t) — Eq. (3)
+
+  ω_i^{t+1} = { n_i / sum_{i=1}^{m} n_i ,        if Q_1(t) = ... = Q_m(t) = 0
+              { Q_i(t) / sum_{i=1}^{m} Q_i(t) ,  otherwise
+
+  where n_i is the data amount (number of local samples) of client i,
+  and Q_i(t) is the cumulative unfairness value from Eq. (2). m is the
+  number of selected clients in that round.
+
+  - When all selected clients' cumulative unfairness is 0 (this is the
+    case at round 0, by initialization), weights fall back to plain
+    data-amount-proportional weighting — exactly standard FedAvg
+    weighting.
+  - Otherwise, weight is proportional to the client's cumulative
+    unfairness Q_i(t): higher unfairness => higher aggregation weight
+    => greater influence on the aggregated global model.
+
+3.4 Client selection rule (top-Q vs random fraction r)
+
+  Client selection is described in Section 3.4 text plus the Remark
+  below Eq. (3), and spelled out in Algorithm 1:
+
+  - CORE RULE: After updating the accumulated unfairness queue, "the
+    server can select the top-m clients with the highest Q_i(t) from
+    the overall clients set N to perform local training." This
+    guarantees vulnerable clients (higher cumulative unfairness) get
+    selected.
+  - PROBLEM NOTED BY THE AUTHORS: Selecting purely by top-Q unfairness
+    can bias the global model toward vulnerable/rare-data clients,
+    which "can be another form of unfairness" and can reduce average
+    global accuracy.
+  - FIX — hyper-parameter r: the paper introduces r to balance the two
+    kinds of unfairness. Of the total m clients selected per round, a
+    RANDOM selection method picks a portion r of the clients, and the
+    unfairness-based (top-Q) selection method picks the remaining
+    (1 - r) portion. (The paper's exact wording: "This is achieved by
+    using a random selection method to select a portion of r clients
+    and using our client selection method to select the remaining.")
+    The range of r is stated as [0, 1] (Section 4.4).
+  - At round t = 0: queues are initialized Q_1(0) = Q_2(0) = ... =
+    Q_N(0) = 0, so with all Q equal, the top-m selection reduces to a
+    (effectively) random selection, and initial aggregation weight is
+    set directly as w_i^{t+1} = n_i / sum_{i=1}^{m} n_i (data-amount
+    proportional) — see Algorithm 1 pseudocode.
+
+  Remark given by the authors on the special-case relationship to
+  FedAvg: "The FedAvg algorithm can be seen as a special case of our
+  FCFL. When α in Eq. (2) is 0, the cumulative unfairness value of all
+  clients Q_i(t) is 0 in every round. Hence, client selection is random
+  and the aggregation weight is proportional to the amount of data. As
+  α increases, the unfairness uf_i^t imposes more influence in Q_i(t),
+  which will have a higher chance of being selected and receiving
+  higher aggregation weights, thus improving the fairness of FL."
+
+3.5 Full Algorithm 1 pseudocode (as given, transcribed faithfully)
+
+  Algorithm 1: Fairness Compensation Federated Learning (FCFL)
+  Input: clients set N; communication rounds T; local epochs E;
+         learning rate η
+  Output: global model θ^{T+1}
+
+  Server executes:
+    initialize global model θ^0
+    for each round t = 0, 1, 2, ..., T do
+        distribute global model θ^t to all clients
+        all clients evaluate θ^t and upload local accuracy {Acc_i^t | i ∈ N}
+        to the server
+        if t == 0 then
+            initialize unfairness queues: Q_1(0) = Q_2(0) = ... = Q_N(0) = 0
+            select m clients to constitute subset S_t according to the
+            selection method
+            initialize the aggregation weight w_i^{t+1} = n_i / Σ_{i=1}^m n_i,
+            i ∈ S_t
+        else
+            calculate the unfairness of all clients via Eq. (1)
+            update the accumulated unfairness queue via Eq. (2)
+            select m clients to constitute subset S_t according to the
+            selection method
+            calculate the aggregation weight via Eq. (3)
+        end if
+        for each client i ∈ S_t do
+            θ_i^{t+1}, Acc~_i^{t+1} ← ClientUpdate(i, θ^t)
+        end for
+        update global model parameters:
+            θ^{t+1} = Σ_{i=1}^m ω_i^{t+1} θ_i^{t+1}
+        estimate global performance:
+            Acc~^{t+1} = Σ_{i=1}^m ω_i^{t+1} Acc~_i^{t+1}
+    end for
+
+  ClientUpdate(i, θ^t): // Run on client i
+      client i ∈ S_t updates θ^t for E epochs with step size η to obtain
+      θ_i^{t+1}
+      client i ∈ S_t evaluates θ_i^{t+1} on local datasets to obtain
+      Acc~_i^{t+1}
+      client sends θ_i^{t+1} and Acc~_i^{t+1} to the server
+
+3.6 Communication/computation overhead notes (Section 3.5)
+
+  - FCFL adds a small communication overhead vs FedAvg: each client
+    uploads local accuracy Acc_i^t once per round ("8 more bits per
+    round" per the paper's own estimate for that scalar), plus the
+    client-side local-training-accuracy upload used for the global
+    accuracy estimate. Paper's claim: "our FCFL only involves a few
+    more bits of communication cost per round."
+  - Computation: clients need one extra accuracy evaluation of the
+    global model on local data (same cost class as FedAvg's existing
+    computations); to save cost, the paper suggests this accuracy can
+    be estimated via mini-batch samples rather than the full local
+    dataset. Server-side computation (unfairness, cumulative
+    unfairness, aggregated weights, global performance estimate) is
+    "simple arithmetic operations within O(N)" and considered
+    negligible given typical server compute power.
+
+
+4. EXPERIMENTS — FULL DETAIL (Section 4, "Experimental Settings" 4.1,
+   and results in 4.2-4.5)
+-------------------------------------------------------------------------------
+
+4.1 Datasets used — EXACT QUOTE
+
+  "All experiments are conducted on three public datasets: MNIST and
+  CIFAR-10 with 100 local clients, and Shakespeare with 31 local
+  clients."
+
+  => YES, CIFAR-10 IS among the datasets tested. The three datasets are:
+     1. MNIST       — 100 local clients
+     2. CIFAR-10     — 100 local clients
+     3. Shakespeare (text, from "The Complete Works of William
+        Shakespeare" [15]) — 31 local clients (speaking roles treated
+        as devices/clients)
+
+  No tabular dataset is used in THIS paper's own experiments (note:
+  Table 1, the related-work comparison table, lists other papers that
+  used tabular/synthetic/Adult/Vehicle/Sent140/etc. datasets — but
+  those are OTHER papers being surveyed, not FCFL's own experiments.
+  FCFL's own experiments use only MNIST, CIFAR-10, and Shakespeare, as
+  quoted above).
+
+4.2 Non-IID data partitioning — EXACT QUOTE
+
+  "We only consider non-IID scenarios since heterogeneous non-IID data
+  distribution is the reason for performance fairness. To simulate this
+  scenario, we design three settings to allocate data to the clients.
+  (1) We sort all data samples based on labels and then split them into
+  200 shards, where each client randomly picks 2 shards without
+  replacement. (2) We utilize the Dirichlet function to set different
+  levels of non-IID local clients [23]. (3) In The Complete Works of
+  William Shakespeare [15], each speaking role in each play is treated
+  as a device, We subsample 31 speaking roles following the setting in
+  [1]."
+
+  Notes:
+  - Setting (1) (sort-by-label, 200 shards, 2 shards per client, no
+    replacement) is the classic non-IID shard partition popularized by
+    McMahan et al.'s original FedAvg paper, applied here — presumably
+    to MNIST and/or CIFAR-10 (the paper does not explicitly map each
+    of the three settings (1)/(2)/(3) one-to-one onto MNIST vs CIFAR-10
+    vs Shakespeare beyond (3) clearly being for Shakespeare; settings
+    (1) and (2) both appear usable for MNIST/CIFAR-10 and the text does
+    not explicitly disambiguate which of (1) or (2) was used for which
+    image dataset in the main results table — this is NOT stated
+    explicitly in the paper, so do not assume one over the other).
+  - Setting (2) (Dirichlet partition) is also the method illustrated
+    earlier in Fig. 2's MNIST example (20 clients, Dirichlet function),
+    used there purely as an illustrative figure, not necessarily the
+    exact setting for main Table 2 results on 100 clients.
+  - No explicit Dirichlet concentration/skew parameter (e.g., no α_Dir
+    or β value) is stated anywhere in the paper for the non-IID
+    partitioning. The paper does NOT give a numeric Dirichlet
+    concentration parameter — do not invent one.
+  - Train/test split for Shakespeare: 8:2 (train:test) per local
+    client, stated explicitly ("We randomly divide the data for each
+    local client into 8:2 for training and testing, respectively").
+    No explicit train/test split ratio is stated for MNIST or CIFAR-10.
+
+4.3 Model architectures — EXACT QUOTE
+
+  "Three models, MLP, CNN, and RNN, are adopted for the experiments.
+  For MNIST, we use a CNN which contains two convolutions and maximum
+  pooling. We use an MLP which contains a hidden layer on CIFAR-10. For
+  Shakespeare, we use an RNN model which contains an embedding layer
+  and an LSTM layer."
+
+  So:
+  - MNIST  -> CNN (2 conv layers + max pooling)
+  - CIFAR-10 -> MLP (one hidden layer) — NOTE: this is MLP, not a deeper
+    CNN/ResNet, for the MAIN results table (Table 2). HOWEVER, Table 3
+    (runtime table) separately lists timings for "MNIST(MLP)",
+    "MNIST(CNN)", "CIFAR-10(MLP)", "CIFAR-10(CNN)" — implying a CNN
+    variant for CIFAR-10 and an MLP variant for MNIST were ALSO run (at
+    least for the efficiency/timing comparison in Table 3), even though
+    Section 4.1's prose only explicitly names CNN-for-MNIST and
+    MLP-for-CIFAR-10 as "the" architectures used. The paper does not
+    give architectural specifics (layer sizes, channel counts, hidden
+    units) for the MLP or the "CNN" used for CIFAR-10 in Table 3 beyond
+    what's quoted above for the primary CNN (MNIST) and MLP (CIFAR-10).
+  - Shakespeare -> RNN (embedding layer + LSTM layer). No further
+    architecture detail (embedding dim, hidden size, number of LSTM
+    layers) is given.
+  - Framework: "All the code is implemented in PyTorch to simulate a
+    federated network with 1 server and several clients."
+
+4.4 Training hyperparameters — EXACT QUOTE
+
+  "where 10% of clients are selected for training in each round. The
+  local batch size is 64, the local epoch is 1, the server's momentum
+  factor is 0.5, and the number of communication rounds for MNIST and
+  CIFAR-10 is 2000 and for Shakespeare is 500. Note that a communication
+  round refers to the process of completing a model update through
+  interaction between the server and the clients."
+
+  Consolidated hyperparameters as literally stated:
+  - Clients selected per round (fraction m/N): 10% of clients (i.e.
+    m = 0.1 * N selected each round for both the top-Q+random
+    combination overall)
+  - Local batch size: 64
+  - Local epochs (E): 1
+  - Server momentum factor: 0.5 (this is described as the SERVER's
+    momentum factor — presumably an SGD-with-momentum optimizer
+    setting; no further detail on which optimizer, or whether this
+    momentum is applied server-side on the aggregated update or
+    elsewhere, is given beyond this one sentence)
+  - Communication rounds (T): 2000 for MNIST, 2000 for CIFAR-10, 500
+    for Shakespeare
+  - Learning rate (η): NOT STATED NUMERICALLY ANYWHERE in the paper's
+    visible text. Algorithm 1 uses η symbolically as an input
+    ("learning rate η") but Section 4.1's experimental settings
+    paragraph does not give a numeric value for η for any dataset. Do
+    not invent a value — the paper simply does not report it in the
+    text extracted.
+  - No explicit weight-decay value stated.
+  - No explicit optimizer name stated (e.g. "SGD") beyond mention of a
+    "momentum factor," which implies SGD-with-momentum but this is not
+    spelled out explicitly as "SGD."
+
+4.5 FCFL-specific and baseline hyperparameter values used in main
+    comparison (Section 4.2)
+
+  - q-FedAvg: q ∈ {0.1, 0.2, 0.5, 1.0, 2.0, 5.0} (grid of q values
+    tried; best performance taken for comparison)
+  - FedFa: (accuracy weight, frequency weight) pairs tried:
+    {(0.4, 0.6), (0.5, 0.5), (0.6, 0.4)} (best taken)
+  - GIFAIR: λ (regularization parameter) ∈ {0.3, 0.5, 0.7} (best taken)
+  - FCFL's own hyperparameters α (controls fairness / queue growth) and
+    r (random-selection fraction) are also tuned; exact best values
+    used per dataset are given directly in Table 2's row labels (see
+    4.6 below): e.g. FCFL|α=0.3, r=0.4 for MNIST; FCFL|α=0.3, r=0.6 for
+    CIFAR-10; FCFL|α=0.1, r=0.6 for Shakespeare.
+  - Results are "averaged from 5 runs with different random seeds."
+  - Baselines compared: FedAvg (classic/vanilla) [15], q-FedAvg [11],
+    FedFa [8], GIFAIR [28, cited in text as "GIFAIR [25]" in one
+    instance of Section 4.1's text — likely a typo/inconsistent
+    citation numbering in the source PDF; Table 1 elsewhere cites
+    GIFAIR as reference [28]]. "Based on the code provided by their
+    authors, we directly rewrite the code for comparison."
+
+4.6 Main results — Table 2 "Statistics of the test accuracy distribution
+    on different datasets" (transcribed in full)
+
+  Columns: Dataset | Method | Accuracy | Best 10% | Worst 10% | Variance
+
+  MNIST:
+    FedAvg                         : Accuracy 95.96 | Best10% 100.00 | Worst10% 87.47  | Variance 15.06
+    q-FedAvg | q=0.2                : Accuracy 96.09 | Best10% 100.00 | Worst10% 88.40  | Variance 12.58
+    FedFa | α=0.6, β=0.4            : Accuracy 96.23 | Best10% 100.00 | Worst10% 88.37  | Variance 12.61
+    GIFAIR | λ=0.5                  : Accuracy 96.12 | Best10% 100.00 | Worst10% 88.63  | Variance 12.72
+    FCFL | α=0.3, r=0.4             : Accuracy 96.06 | Best10% 100.00 | Worst10% 89.17  | Variance 11.03   (best variance & best worst-10%, bolded in paper)
+
+  CIFAR-10:
+    FedAvg                         : Accuracy 46.35 | Best10% 68.67 | Worst10% 20.16 | Variance 178.93
+    q-FedAvg | q=2.0                : Accuracy 47.14 | Best10% 66.81 | Worst10% 24.98 | Variance 149.50
+    FedFa | α=0.6, β=0.4            : Accuracy 46.64 | Best10% 68.10 | Worst10% 23.19 | Variance 164.68
+    GIFAIR | λ=0.5                  : Accuracy 46.61 | Best10% 67.02 | Worst10% 23.18 | Variance 158.36
+    FCFL | α=0.3, r=0.6             : Accuracy 46.12 | Best10% 65.39 | Worst10% 28.03 | Variance 114.59  (best variance & best worst-10%, bolded in paper)
+
+  Shakespeare:
+    FedAvg                         : Accuracy 49.16 | Best10% 70.65 | Worst10% 35.34 | Variance 89.87
+    q-FedAvg | q=2.0                : Accuracy 50.24 | Best10% 69.77 | Worst10% 37.92 | Variance 75.99
+    FedFa | α=0.5, β=0.5            : Accuracy 49.03 | Best10% 69.06 | Worst10% 36.23 | Variance 79.54
+    GIFAIR | λ=0.3                  : Accuracy 50.01 | Best10% 68.50 | Worst10% 36.24 | Variance 78.25
+    FCFL | α=0.1, r=0.6             : Accuracy 50.55 | Best10% 68.74 | Worst10% 38.55 | Variance 67.48  (best accuracy, best variance & best worst-10%, bolded in paper)
+
+  Narrative claims tied to this table (quoted/paraphrased):
+  - FCFL achieves lowest variance on all three datasets: 11.03 (MNIST),
+    114.59 (CIFAR-10), 67.48 (Shakespeare).
+  - On CIFAR-10, vs q-FedAvg(q=2.0): variance reduced by 23.4%.
+  - vs FedFa: variance reduced by 30.4%. (This 30.4% figure matches the
+    paper's abstract and conclusion claim: "outperforms the
+    state-of-the-art baselines by improving the fairness metric up to
+    30.4%" / "demonstrated to improve fairness by 30.4%.")
+  - vs GIFAIR: variance reduced by 27.7%.
+  - Worst-10% performance: CIFAR-10 improved from 24.98 (q-FedAvg,
+    second-best baseline) to 28.03 (FCFL). MNIST worst-10% improved
+    from 88.63 to 89.17. Shakespeare worst-10% improved from 37.92 to
+    38.55.
+  - Average accuracy: FCFL reaches 96.06% (MNIST), 46.12% (CIFAR-10),
+    50.55% (Shakespeare) — described as "very competitive (around 1%
+    difference)" vs other baselines; best-10% accuracy is "a bit lower
+    than some baselines" because FCFL emphasizes vulnerable clients
+    over best-performing ones.
+
+4.7 Table 3 — "The running time of one communication round" (seconds)
+
+  Columns: Method | MNIST(MLP) | MNIST(CNN) | CIFAR-10(MLP) | CIFAR-10(CNN)
+
+    FedAvg   : 0.87 | 1.91 | 0.89 | 1.84
+    q-FedAvg : 0.95 | 1.99 | 0.96 | 1.90
+    FedFa    : 1.03 | 2.01 | 0.96 | 1.91
+    GIFAIR   : 0.88 | 1.90 | 0.88 | 1.85
+    FCFL     : 0.94 | 2.01 | 0.96 | 1.95
+
+  (Bolded best-in-column values in the original: MNIST(MLP) FedAvg
+  0.87 is fastest; MNIST(CNN) GIFAIR 1.90 fastest; CIFAR-10(MLP) GIFAIR
+  0.88 fastest; CIFAR-10(CNN) FedAvg 1.84 fastest — paper states FCFL
+  "does not introduce too much time cost" and "can achieve the same
+  time efficiency as FedFa and q-FedAvg" in some cases.)
+
+  Note: this table's column structure (MLP and CNN variants for BOTH
+  MNIST and CIFAR-10) is somewhat inconsistent with Section 4.1's
+  earlier statement that MNIST uses CNN and CIFAR-10 uses MLP as "the"
+  model — Table 3 appears to additionally report timings for the
+  non-primary architecture (MLP-for-MNIST, CNN-for-CIFAR-10) purely for
+  the runtime/efficiency comparison, not necessarily used for the main
+  accuracy/fairness results in Table 2. The paper does not clarify this
+  explicitly; flagging as an ambiguity rather than resolving it.
+
+4.8 Hyperparameter sensitivity — effect of r (Section 4.4, Fig. 5)
+
+  - r (client selection ratio handled by RANDOM selection, vs. the
+    remaining 1-r by unfairness/top-Q selection) is swept over its
+    full range [0, 1].
+  - Theoretical expectation stated by authors: increasing r increases
+    accuracy (more randomness lets the global model see more clients'
+    data) but also increases variance among clients (fewer vulnerable
+    clients prioritized).
+  - MNIST (Fig. 5a): due to MNIST's simplicity, performance
+    distribution per client is already fairly uniform; average
+    precision and variance do NOT show significant change as r varies.
+  - CIFAR-10 (Fig. 5b): effect is clearly visible — average accuracy
+    AND variance both increase as r increases, confirming the
+    theoretical expectation.
+  - Parameter r was tuned via grid search. r = 0.6 was selected as "the
+    best value that can reach a perfect trade-off between accuracy and
+    variance (i.e., fairness)" — this matches the r=0.6 used for FCFL's
+    CIFAR-10 and Shakespeare rows in Table 2 (MNIST's best row instead
+    used r=0.4, selected presumably because of MNIST's low sensitivity
+    to r per the grid search / Fig 5a finding, though the paper does
+    not explicitly restate this reasoning for why MNIST's optimal r
+    differs).
+
+4.9 Ablation experiments (Section 4.5, Table 4) — CIFAR-10 only
+
+  Two variants compared against full FCFL, all on CIFAR-10:
+  - FCFL|RS: replaces unfairness-based CLIENT SELECTION with pure
+    random selection (keeps unfairness-based reweighting).
+  - FCFL|DAR: replaces unfairness-based REWEIGHTING with data-amount
+    reweighting (keeps unfairness-based client selection).
+
+  Table 4 "Ablation studies of FCFL on CIFAR-10":
+  Columns: Method | Accuracy | Best 10% | Worst 10% | Variance
+
+    FCFL     : 46.12 | 65.39 | 28.03 | 114.59
+    FCFL|RS  : 46.06 | 65.60 | 22.91 | 151.31
+    FCFL|DAR : 43.56 | 61.00 | 26.57 | 96.31
+
+  Findings stated by authors:
+  - FCFL vs FCFL|RS: unfairness-based SELECTION significantly improves
+    worst-10% performance (28.03 vs 22.91) and reduces variance (114.59
+    vs 151.31) — shows unfairness-based client selection effectively
+    helps the unfairness issue.
+  - FCFL vs FCFL|DAR: FCFL|DAR achieves much LOWER variance (96.31,
+    even lower than full FCFL's 114.59) but at the cost of global
+    accuracy (43.56 vs 46.12) and best-10% accuracy (61.00 vs 65.39) —
+    i.e., pure unfairness-based reweighting alone (without the
+    data-amount fallback mechanism) over-sacrifices average/majority
+    performance. The authors interpret this as showing unfairness-based
+    REWEIGHTING (as designed in FCFL, i.e. the Eq. 3 two-branch form
+    with the data-amount fallback) "can improve accuracy effectively"
+    relative to a naive always-unfairness-weighted alternative.
+  - Overall conclusion: full FCFL "takes advantage of both client
+    selection and reweighting strategy, providing a well-justified
+    fairness and performance in FL."
+
+
+5. OTHER IMPLEMENTATION-RELEVANT DETAILS
+-------------------------------------------------------------------------------
+
+5.1 Baselines compared against (full list, Section 4 / Table 1 context)
+  - FedAvg [15] (McMahan et al., classic FL averaging)
+  - q-FedAvg [11] (Li, Sanjabi, Beirami, Smith 2019 — fair resource
+    allocation via loss reweighting with parameter q)
+  - FedFa [8] (Huang, Li, Wang, Zhang, Du, Huang 2022 — weight
+    selection combining training accuracy and frequency, double
+    momentum gradient optimization)
+  - GIFAIR(-FL) [28] (Yue, Nouiehed, Al Kontar 2023 — regularization
+    term penalizing loss differences among client groups; cited once in
+    running text of Sec 4.1 with number [25] — appears to be an
+    inconsistent in-text citation number vs. Table 1's [28]; both refer
+    to the same GIFAIR-FL work by context)
+
+  FCFL is explicitly framed as reducing to FedAvg when α=0 (see Section
+  3.4 Remark, quoted in full above).
+
+5.2 Related methods surveyed but NOT used as empirical baselines in
+    FCFL's own experiments (context only, from Table 1 / Section 2):
+  AFL [16] (Mohri et al. 2019, minimax optimization — tested on Fashion
+    MNIST, Adult, Cornell movie, PTB); FedGini [12]; DRFL [30]; Ada-FFL
+    [2]; PG-FFL [21]; FedFV [23]; FedMGDA+ [6]; FedMDFG [17]; FairWire+
+    [5]. These are discussed for context/related work only — their
+    datasets (as listed in Table 1) belong to THOSE papers, not to
+    FCFL's own experiments, and must not be conflated with FCFL's
+    experimental setup in Section 4.
+
+5.3 Client selection fairness works cited but not compared empirically:
+    Power-of-Choice [1] (Cho, Wang, Joshi — highest-loss client
+    selection), GreedyFed [20] (Shapley-value-based client selection),
+    FairFedCS [18] (Lyapunov-optimization-based selection fairness).
+    FCFL distinguishes itself as "the first work to harness fair client
+    selection to achieve performance fairness of FL" (i.e., linking
+    client selection explicitly to the performance-fairness goal,
+    unlike these prior selection-fairness or performance-boosting
+    selection works).
+
+5.4 Figure 2 illustrative experiment (Section 3.1, separate from main
+    Section 4 results — uses different settings, do NOT use these
+    numbers for config-building, included here only for context):
+  - Dataset: MNIST
+  - Model: "the CNN model in Fig. 2" (same CNN described for MNIST
+    elsewhere)
+  - 20 clients (not 100 — this is a smaller illustrative setup)
+  - Dirichlet function used for partitioning
+  - 2 clients selected per training round
+  - Compares three selection strategies: unfairness-based, random,
+    data-amount-based — shown in Fig. 2(b) bar chart of selection
+    counts per client. This illustrates why a vulnerable client (e.g.
+    "client 3", a label used as an example in the text, with limited
+    local data) is rarely selected under data-amount-based selection,
+    but is selected much more frequently under FCFL's unfairness-based
+    selection.
+
+5.5 Explicit statement on "fairness metric" terminology
+  Throughout, "the fairness metric" that the 30.4% improvement figure
+  (abstract/conclusion) refers to is VARIANCE of per-client test
+  accuracy (as defined/used throughout Section 4.2 and Table 2) — not
+  any other named fairness metric (e.g., not Gini coefficient, not a
+  Jain's fairness index — the paper does not use those terms for its
+  own primary metric; those are mentioned only as other methods' names,
+  e.g. FedGini, GIFAIR which internally may use Gini-like penalties,
+  but the paper's own reported comparison metric is variance).
+
+5.6 Known gaps / things the paper does NOT state (do not fabricate
+    these for configs — flagged explicitly per the task instructions):
+  - No numeric learning rate (η) value for any dataset.
+  - No explicit optimizer name (SGD assumed via "momentum factor"
+    language, but never spelled out).
+  - No explicit weight-decay value.
+  - No explicit Dirichlet concentration/skew parameter value.
+  - No explicit mapping stating which of partitioning settings (1)
+    shard-based or (2) Dirichlet was used for MNIST vs CIFAR-10 in the
+    MAIN Table 2 results (both are described as options in 4.1, not
+    pinned to a specific dataset for the headline numbers).
+  - No architecture hyperparameter specifics (conv channel counts,
+    kernel sizes, MLP hidden-layer width, RNN embedding/hidden
+    dimensions, number of LSTM layers/units).
+  - No explicit "future work"-stated numeric follow-ups beyond the
+    prose in the Conclusion (Section 5): the authors state future work
+    will look at estimating unfairness more accurately without exact
+    global performance access, adaptively selecting hyper-parameters,
+    and combining with selection fairness — no numbers attached to
+    these.
+
+===============================================================================
+END OF EXTRACTION
+===============================================================================

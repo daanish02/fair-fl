@@ -1,0 +1,505 @@
+================================================================================
+NOTE ON SOURCE COMPLETENESS
+================================================================================
+The source PDF provided (same folder, .pdf) contains only 11 pages: title/abstract,
+main body (Sections 1-7), Broader Impacts, Acknowledgments, and References (which
+run to page 11). The in-text references to "Appendix A-C" (convergence proofs for
+Theorems 1/2), "Appendix D" (proof of Theorem 3), and especially "Appendix I"
+(explicitly cited in Section 5 as containing "more details about the experiment
+configuration") are NOT present in this file. The appendices were not included in
+the PDF supplied. Anything the appendices would contain (exact MNIST/CIFAR-10
+hyperparameters beyond what's stated in the main text and figure captions, exact
+number of workers/clients, exact non-IID partition rule beyond "1-2 classes per
+node", exact learning rates, batch sizes, optimizer details, number of noise
+samples n used for the "2n+1 samples" noise mechanism in experiments, etc.) is
+NOT available from this source and is NOT guessed below. Every numeric claim in
+Section 5 of this extraction is either quoted/paraphrased directly from the main
+text or figure captions, or explicitly flagged as "not stated in available text."
+
+================================================================================
+1. CITATION
+================================================================================
+Title: Distributed Training with Heterogeneous Data: Bridging Median- and
+Mean-Based Algorithms
+
+Authors: Xiangyi Chen (University of Minnesota), Tiancong Chen* (University of
+Minnesota, *equal contribution), Haoran Sun (University of Minnesota),
+Zhiwei Steven Wu (Carnegie Mellon University), Mingyi Hong (University of
+Minnesota)
+
+Venue: 34th Conference on Neural Information Processing Systems (NeurIPS 2020),
+Vancouver, Canada.
+
+Year: 2020
+
+================================================================================
+2. PROBLEM SETUP / WHAT THE PAPER IS SOLVING
+================================================================================
+The paper studies distributed/federated training in the parameter-server
+paradigm, where the goal is to minimize f(x) = (1/M) * sum_{i=1}^{M} f_i(x)
+across M worker nodes, each with its own local objective f_i (Eq. 1), with
+f_i defined either as an expectation over a local data distribution p_i(zeta)
+or as an empirical average over K_i local samples (Eq. 2).
+
+Two "median-based" distributed algorithms exist in the literature: SIGNSGD
+with majority vote (communication-efficient, 1-bit gradient compression) and
+MEDIANSGD / MEDIANGD (coordinate-wise median aggregation, originally proposed
+for Byzantine robustness). Both were previously analyzed only under the
+assumption that local data/gradients are i.i.d. across workers (homogeneous
+data). The paper shows that under heterogeneous (non-i.i.d.) data, as in
+Federated Learning, both algorithms fail to converge whenever there is a gap
+between the expected median and expected mean of the local gradients across
+workers. The paper's contribution is (a) proving SIGNSGD is itself a
+median-based algorithm (it updates along the signed median direction, not a
+literal sign-of-mean), (b) proving a non-convergence result under
+heterogeneous data, and (c) proposing a noise-perturbation mechanism (adding
+symmetric, unimodal noise to local gradients before aggregation) that
+provably closes the median-mean gap and restores convergence to a stationary
+point for both algorithms, now called Noisy SIGNSGD and Noisy MEDIANSGD.
+
+================================================================================
+3. ALGORITHM 2 — MEDIANSGD (paper calls the base algorithm "MEDIANSGD" in the
+   algorithm box; also refers to it as MEDIANGD / "generalized stochastic
+   version of MEDIANGD" when citing Yin et al. [28])
+================================================================================
+Pseudocode as given verbatim (Algorithm 2, "MEDIANSGD (with M nodes)"):
+
+  Input: learning rate delta, current point x_t
+  1: g_{t,i} <- grad f_i(x_t) + sampling noise          (for each node i)
+  2: x_{t+1} <- x_t - delta * median({g_{t,i}}_{i=1}^{M})
+
+Notation: for a set of vectors {a_i}_{i=1}^n, median({a_i}) denotes the
+COORDINATE-WISE median of the vectors (i.e., for each coordinate j, take the
+median across the M nodes' values at coordinate j). sign(v) is the signed
+(coordinate-wise) vector; (v)_j denotes the jth coordinate of v.
+
+Assumptions used in the analysis (stated as A1-A4, apply to both algorithms):
+  A1. Unbiased gradient estimator: E[g_i(x)] = grad f_i(x).
+  A2. Bounded variance: E[ || (median({g_t}))_j - E[(median({g_t}))_j | x_t] ||^2 ] <= sigma_m^2, for all j in [d].
+      (A variant of the classical bounded-variance assumption, applied to the
+      median rather than individual gradients; satisfied if all g_{t,i} have
+      bounded variance.)
+  A3. f has Lipschitz gradient: || grad f(x) - grad f(y) || <= L ||x - y||.
+  A4. M is an odd number (ensures the coordinate-wise median is well defined).
+
+Theorem 2 (convergence of plain/un-noised MEDIANSGD under A1-A4):
+Suppose A1-A4 hold. Define D_f := f(x_1) - min_x f(x). Set
+  delta = min( 1/sqrt(T*d), 1/(2L) ).
+Then MEDIANSGD yields:
+
+  (1/T) * sum_{t=1}^{T} E[ ||grad f(x_t)||^2 ]
+    <= (2*sqrt(2)*sqrt(d)/sqrt(T)) * D_f
+       + 2L*sqrt(d)*sigma_m^2
+       + (1/T) * sum_{t=1}^{T} E[ || grad f(x_t) - E[median({g_t}) | x_t] ||^2 ]
+
+(This is Eq. (5) in the paper.) As T -> infinity, the RHS is dominated by the
+last term, i.e. the squared gap between the true gradient and the expected
+coordinate-wise median of local gradients. If local gradients at different
+nodes are drawn from the same symmetric, unimodal distribution (homogeneous
+case) this gap term vanishes and the algorithm converges to a stationary
+point at rate O(sqrt(d)/sqrt(T)). Under heterogeneous data (gap nonzero), the
+paper's Theorem 3 shows this gap is NOT just a proof artifact: there provably
+exist problem instances where MEDIANSGD converges only to a point with
+||grad f(x_hat*)||^2 >= (1/T) sum_t E[||E[median({g_t})] - grad f(x_t)||^2] >= 1,
+i.e., a constant lower bound on the limiting gradient norm proportional to the
+median-mean gap, so plain MEDIANSGD does NOT converge to a true stationary
+point when data is heterogeneous.
+
+Noisy version — Algorithm 4, "Noisy MEDIANSGD":
+  Input: learning rate delta, current point x_t
+  1: g_{t,i} <- g_hat_{t,i} + b * xi_{t,i}
+  2: x_{t+1} <- x_t - delta * median({g_{t,i}}_{i=1}^{M})
+
+Here g_hat_{t,i} is the original (possibly stochastic) local gradient
+estimator, b is a scalar controlling the noise magnitude, and xi_{t,i} is
+sampled i.i.d. (per coordinate) from a symmetric, unimodal distribution with
+mean 0 and variance 1 and pdf h(z) (this is the "noise model" — see Section 3
+below for the general noise-closing-the-gap theorem, Theorem 4, that
+motivates this). The only change versus the un-noised Algorithm 2 is adding
+noise to the local gradient before the median/aggregation step.
+
+Convergence guarantee for Noisy MEDIANSGD — Theorem 6:
+Suppose A1, A3, A4 are satisfied and |(g_hat_{t,i})_j| <= Q for all t, j
+(bounded raw gradient coordinates). Each coordinate of xi_{t,i} is sampled
+i.i.d. from a symmetric, unimodal distribution with mean 0, variance 1, pdf
+h(z); h'(z) is uniformly bounded and absolutely integrable. Define
+D_f := f(x_1) - min_x f(x). Set delta <= 1/(2L). Then:
+
+  (1/T) * sum_{t=1}^{T} E[ ||grad f(x_t)||^2 ] <= (2/(T*delta)) * D_f
+       + O(d/b^2) + O(delta * d * b^2)
+
+(Eq. 12.) This shows a bias-variance-type trade-off in b: larger b shrinks
+the median-mean gap term O(d/b^2) but inflates the noise-injection term
+O(delta*d*b^2). The paper states the best achievable convergence rate under
+this trade-off is O(d^{2/3} / T^{1/3}), obtained by setting
+b = T^{1/6} * d^{1/6} and delta = 1/(T^{2/3} * d^{2/3}).
+The paper notes MEDIANSGD's robustness (resistance to extreme/outlier
+values, e.g. Byzantine workers) comes from using the median rather than mean;
+as more noise b is added, the median estimator is "gradually converting...to
+a mean estimator," which should make MEDIANSGD progressively LESS robust to
+Byzantine/outlier effects even as it converges better under heterogeneity. No
+closed-form numerical constants are given for the O(.) terms in Theorem 6 in
+the main text (constants presumably detailed in the appendix, which is not
+included in this PDF).
+
+================================================================================
+4. ALGORITHM 3 — SIGNSGD (WITH MAJORITY VOTE) and its noisy variant
+   (the user's file is named signsgd.py; in this paper SIGNSGD with majority
+   vote is "Algorithm 1," not "Algorithm 3" — the noisy version of SIGNSGD is
+   "Algorithm 3." See note below on numbering.)
+================================================================================
+NOTE ON ALGORITHM NUMBERING: In this paper, the four algorithm boxes are:
+  Algorithm 1 = SIGNSGD (with M nodes) [plain/base]
+  Algorithm 2 = MEDIANSGD (with M nodes) [plain/base]
+  Algorithm 3 = Noisy SIGNSGD
+  Algorithm 4 = Noisy MEDIANSGD
+This differs from the numbering implied in the task prompt (which called
+noisy signSGD "Algorithm 3" as if it were the base algorithm); in the actual
+paper, "Algorithm 3" is specifically the NOISY SIGNSGD variant, and plain
+SIGNSGD with majority vote is Algorithm 1. Both the plain and noisy versions
+are transcribed below for completeness since both are implementation-relevant.
+
+Pseudocode, plain SIGNSGD — Algorithm 1, "SIGNSGD (with M nodes)":
+  Input: learning rate delta, current point x_t
+  1: g_{t,i} <- grad f_i(x_t) + sampling noise          (for each node i)
+  2: x_{t+1} <- x_t - delta * sign( sum_{i=1}^{M} sign(g_{t,i}) )
+
+This is literally a majority vote: each node sends only the coordinate-wise
+sign of its local (stochastic) gradient; the server sums the M sign vectors
+and takes the sign of that sum (i.e., majority vote per coordinate), then
+takes a step of fixed size delta in that direction. This is the source of
+SIGNSGD's communication efficiency: only 1-bit-per-coordinate gradient
+information needs to be sent per node per round (paper states this gives up
+to 16x or 32x communication reduction versus plain SGD in the homogeneous
+MNIST experiment, see Section 5 below).
+
+Key structural result connecting SIGNSGD to the median — Proposition 1:
+"When M is odd and median({g_t}) != 0, we have
+  sign( sum_{i=1}^{M} sign(g_{t,i}) ) = sign( median({g_t}) )."
+(Eq. 3.) I.e., majority-vote-of-signs is mathematically identical to the sign
+of the coordinate-wise median of the raw gradients (when M is odd and the
+median is nonzero). This is presented as the paper's key structural
+observation ("SIGNSGD as a median-based algorithm") that lets it analyze
+SIGNSGD and MEDIANSGD under one unified median-based framework.
+
+Convergence guarantee for plain SIGNSGD — Theorem 1:
+Suppose A1-A4 are satisfied, and define D_f := f(x_1) - min_x f(x). For
+SIGNSGD with delta = sqrt(D_f) / sqrt(L*d*T), the following holds:
+
+  (1/T) * sum_{t=1}^{T} E[ ||grad f(x_t)||_1 ]
+    <= (3/2) * sqrt(d*L*D_f) / sqrt(T)
+       + 2*d*sigma_m
+       + 2 * (1/T) * sum_{t=1}^{T} E[ || E[median({g_t}) | x_t] - grad f(x_t) ||_1 ]
+
+(Eq. 4.) As T -> infinity, RHS is dominated by the difference between the
+median and mean of gradients, plus the standard deviation sigma_m on the
+median. If gradient estimators across nodes are drawn from the SAME unimodal,
+symmetric distribution (the homogeneous assumption of prior work, e.g.
+Bernstein et al. [4]), this recovers the bound in Bernstein et al. [4]: in
+that case E[median({g_t})|x_t] = E[grad f(x_t)] and sigma_m = O(sigma_l /
+sqrt(M)) if the per-coordinate noise on each local gradient has variance
+bounded by sigma_l^2 (citing Theorem 1.4.1 in Miller [19], "The Probability
+Lifesaver: Order Statistics and the Median Theorem"). In that homogeneous
+case, Eq. 4 becomes:
+  (1/T) sum_t E[||grad f(x_t)||_1] <= (3/2)*sqrt(d*L*D_f)/sqrt(T) + O(d/sqrt(M))
+and using a larger minibatch to decrease sigma_l further improves convergence.
+
+Under heterogeneous data (gap nonzero), Theorem 3 shows (companion to the
+MEDIANSGD result above) that there exist problem instances where SIGNSGD
+converges only to a point x_hat* with
+  ||grad f(x_hat*)||_1 >= (1/T) sum_t E[||E[median({g_t})] - grad f(x_t)||_1] >= 1,
+i.e. a nonzero, constant lower bound on the (L1) gradient norm at the point
+SIGNSGD converges to — confirming SIGNSGD genuinely fails to reach a
+stationary point under heterogeneous data, not merely as an analysis
+artifact. (The paper gives a concrete 1-D 3-worker counterexample earlier in
+Section 1: f(x) = (1/3) sum_{i=1}^3 (x - a_i)^2 / 2 with a_1=1, a_2=2, a_3=10,
+step size delta=0.001, initial point x_0=0.0005, run for up to 10,000
+iterations — Figure 1 shows both SIGNSGD and MEDIANSGD driving the MEDIAN of
+gradients to 0 while the TRUE gradient/mean stays roughly constant /
+nonzero.)
+
+Noisy SIGNSGD — Algorithm 3, "Noisy SIGNSGD":
+  Input: learning rate delta, current point x_t
+  1: g_{t,i} <- g_hat_{t,i} + b * xi_{t,i}
+  2: x_{t+1} <- x_t - delta * sign( sum_{i=1}^{M} sign(g_{t,i}) )
+
+Same structure as plain SIGNSGD (majority vote of signs), except the local
+gradient g_hat_{t,i} has artificial noise b*xi_{t,i} added before the sign is
+taken. xi_{t,i} sampled i.i.d. (coordinate-wise) from a symmetric, unimodal
+distribution with mean 0, variance 1, pdf h(z); b is a scalar noise-scale
+parameter. (Paper notes this injected noise is similar in spirit to the noise
+added for differential privacy — when a bound on gradient norm is known, a
+standard privacy accountant could be used to compute the associated privacy
+cost, though the paper explicitly leaves the DP utility analysis "to future
+works.")
+
+Convergence guarantee for Noisy SIGNSGD — Theorem 5:
+Suppose A1, A3, A4 are satisfied and |(g_hat_{t,i})_j| <= Q for all t, j. Each
+coordinate of xi_{t,i} sampled i.i.d. from a symmetric, unimodal distribution
+with mean 0, variance 1, pdf h(z); h'(z) and h''(z) uniformly bounded and
+absolutely integrable. Define sigma to be the standard deviation of the
+median of 2n+1 samples drawn from h(z); D_f := f(x_1) - min_x f(x); W_t :=
+the set of coordinates j at iteration t with |grad f(x_t)_j| / (b*sigma) >=
+2/sqrt(3). For SIGNSGD:
+
+  (1/T) * sum_{t=1}^{T} ( sum_{j in W_t} |grad f(x_t)_j|
+                           + sum_{j in [d]\W_t} (1/(b*sigma)) * grad f(x_t)_j^2 )
+    <= 3*D_f / (T*delta)
+       + 3/T * sum_{t=1}^{T} E[ sum_{j=1}^{d} |grad f(x_t)_j| * O(1/b^2) ]
+       + (3*L/2) * delta * d
+
+(Eq. 11.) Effect of b: the term that decreases with b on the RHS is the
+convergence gap introduced by heterogeneous data / data sampling; without
+artificial noise this term is a constant (does not vanish), confirming noise
+provably helps. The other two RHS terms are standard and diminish with proper
+choice of T and delta — reflecting a trade-off between convergence speed
+(worse with larger b) and final accuracy (better with larger b). Optimizing b
+and delta jointly, the paper obtains a worst-case bound:
+  (1/T) sum_t ( sum_{j in W_t} T^{1/4} d^{1/4} |grad f(x_t)_j|
+                + sum_{j in [d]\W_t} grad f(x_t)_j^2 )  <=  O( d^{3/4} / T^{1/4} )
+by setting b = T^{1/4} * d^{1/4} and delta = 1/sqrt(T*d). This rate is
+explicitly noted to be SLOWER than plain SGD's O(sqrt(d)/sqrt(T)) rate,
+implying "SIGNSGD may not be preferred when data heterogeneity is large."
+The paper also contrasts its fix with the error-feedback fix of SIGNSGD in
+Karimireddy et al. [13]: the noise approach here addresses the
+multi-worker/heterogeneity setting without modifying SIGNSGD's update rule,
+whereas error feedback is designed for the single-worker setting and uses
+gradient-magnitude information in parameter updates (i.e., the two fixes
+target different failure modes and are not directly substitutable).
+
+GENERAL NOISE-CLOSES-THE-GAP RESULT (Theorem 4, Section 3) underlying both
+noisy algorithms:
+Given 2n+1 numbers u_1,...,u_{2n+1}, a symmetric unimodal noise distribution
+with mean 0, variance 1, pdf h_0(z), cdf H_0(z) (h_0'(z) uniformly bounded
+and absolutely integrable). Draw 2n+1 i.i.d. samples xi_1,...,xi_{2n+1} from
+h_0(z). Define u_hat_i := u_i + b*xi_i and u_bar := (1/(2n+1)) sum u_i [the
+paper writes u_bar as sum_{i=1}^{2n+1} u_i, consistent with its notation
+elsewhere using a normalized sum/mean].
+(a) E[median({u_hat_i}_{i=1}^{2n+1})] = u_bar + O( max_{i,j} |u_i - u_j|^2 / b )
+    — Eq. 6 — i.e. the expected median of the noise-perturbed values
+    approaches the true mean u_bar at rate O(1/b) as b grows.
+    Var(median({u_hat_i})) = O(b^2) — Eq. 7.
+(b) Further assuming h_0''(z) is uniformly bounded and absolutely integrable,
+    and denoting r_b(z) as the pdf of median({u_hat_i}), the pdf decomposes as
+      r_b(u_bar + z) = (1/b) g(z/b)  [symmetric part]  +  (1/b) v(z/b)  [asymmetric part]
+    (Eq. 8), where g(z) is the pdf of the sample median of 2n+1 draws from
+    h_0(z) (symmetric about 0) given explicitly by Eq. 9 (a combinatorial sum
+    over subsets S of [2n+1]\{i} of products of H_0(z) and H_0(-z) terms,
+    weighted by h_0(z)), and the asymmetric part satisfies
+      integral_{-inf}^{inf} (1/b)|v(z/b)| dz = O( max_i |u_bar - u_i|^2 / b^2 )  (Eq. 10).
+    I.e. as b grows, the pdf of the median becomes increasingly symmetric
+    (asymmetric part shrinks at rate O(1/b^2)), and the gap between expected
+    median and true mean shrinks at rate O(1/b).
+Gaussian noise is noted to satisfy all assumptions of Theorem 4. The paper
+also states it observes EMPIRICALLY (not proven) that other common symmetric
+distributions with non-differentiable points, such as Laplace and uniform
+distributions, also appear to make the pdf increasingly symmetric and bring
+the expected median closer to the mean as b grows.
+
+================================================================================
+5. EXPERIMENTS SECTION — EVERY HYPERPARAMETER / DATASET DETAIL STATED
+================================================================================
+IMPORTANT CAVEAT: Section 5 explicitly states "More details about the
+experiment configuration can be found in Appendix I" — that appendix is NOT
+present in the supplied PDF (which ends at page 11, in the References). All
+details below are therefore limited to what is stated directly in the main
+text of Section 5 and in the two figure captions (Figures 2 and 3). Anything
+not listed here (exact number of worker nodes M, exact learning rate value(s),
+batch size, total number of training rounds/iterations beyond axis ranges
+shown in figures, exact non-IID partition/Dirichlet parameter, model
+architecture specifics, optimizer momentum settings, number of noise samples
+n, etc.) is NOT stated in the available text and should NOT be assumed for
+config-building. Where a figure's x-axis gives an iteration count, that is
+reported as a visual axis range, not necessarily an explicit stated
+hyperparameter.
+
+Datasets used: "We conduct experiments on MNIST and CIFAR-10 datasets."
+  - CIFAR-10 IS used in this paper's experiments (confirmed — Figure 3 and
+    its surrounding text, page 8-9, are explicitly titled "Comparison of
+    SIGNSGD on CIFAR-10").
+  - MNIST is also used (Figure 2, page 8).
+  - No other datasets are mentioned as being used in experiments.
+
+Algorithm(s) actually tested empirically: Only SIGNSGD (plain and noisy
+variants) is tested empirically. Quote: "Since SIGNSGD is better studied
+empirically and MEDIANSGD is more of theoretical interest so far, we use
+SIGNSGD to demonstrate the benefit of injecting noise." MEDIANSGD / Noisy
+MEDIANSGD has NO reported empirical results in this paper — all quantitative
+experiment numbers below pertain to SIGNSGD only.
+
+Data heterogeneity / partitioning scheme: "For both datasets, the data
+distribution on each node is heterogeneous, more specifically, each node
+contains some exclusive data for one or two out of ten categories." This is
+the only partitioning detail given — i.e., each worker/node holds data from
+only 1-2 of the 10 classes (exclusively, implying a extreme non-IID /
+shard-based partition similar to McMahan et al.'s pathological non-IID
+split). No Dirichlet alpha or other quantitative heterogeneity parameter is
+mentioned. No explicit number of nodes/workers M is stated in the main text
+for either experiment.
+
+--- Experiment 1 (MNIST), Figure 2 ---
+Caption: "Comparison of SIGNSGD with different noise on MNIST."
+Four sub-plots (a-d): (a) Norm of Gradient, (b) Training Loss, (c) Training
+Accuracy, (d) Testing Accuracy — all plotted vs. "Iteration" with x-axis
+range shown as 0 to 5 (x10^4), i.e. up to roughly 50,000 iterations.
+Legend entries shown in the figure (as transcribed from the plot legend):
+  - "without noise"
+  - "artificial noise b=1e5" [legend text reads "artificial noise b=1e5" per
+    the plot; exact value partially illegible in the extracted image — stated
+    here as closely as legible, treat with caution]
+  - "artificial noise b=1e6" [same caveat]
+  - "subsampling B=128" [approx.; legend text partially illegible]
+Because the legend text in Figure 2 is small and not fully legible from the
+extracted page image, the exact numeric values of b and the subsampling
+batch size B shown in this legend could NOT be confirmed with certainty and
+are NOT to be relied upon for config-building; treat these as approximate/
+unconfirmed transcriptions only. The surrounding body text states:
+
+"We first compare full batch Noisy SIGNSGD (Algorithm 3) with different b
+(i.e. adding random Gaussian noise with different standard deviation),
+SIGNSGD with sub-sampling on data, and full batch SIGNSGD without any noise
+on MNIST. This experiment is to check the effects of the noise generated
+from data sub-sampling and the artificial noise. We see that SIGNSGD without
+noise stuck at some point where the gradient is a constant (the median
+should be oscillating around zero). At the same time, both Noisy SIGNSGD or
+SIGNSGD with sub-sampling drive the gradient to be smaller. From the results
+in Figure 2, we can see that both training accuracy and test accuracy of
+SIGNSGD without noise are very poor. The perturbation indeed helps improve
+the classification accuracy in practice."
+
+Noise distribution used in experiments: Gaussian (stated explicitly: "adding
+random Gaussian noise with different standard deviation" — this confirms the
+noise xi_{t,i} used empirically is Gaussian, consistent with Theorem 4's note
+that Gaussian satisfies all its assumptions).
+
+Full-batch vs. sub-sampling: the MNIST experiment compares (i) full-batch
+Noisy SIGNSGD with different b values, (ii) SIGNSGD with sub-sampling on data
+(no artificial noise — relying on the sampling noise itself), and (iii) full
+batch SIGNSGD with no noise at all. No explicit learning rate, batch size (B)
+numeric value, or number of nodes M is given in the body text for this
+experiment (only a partially legible "subsampling B=..." legend entry per
+above caveat).
+
+--- Experiment 2 (CIFAR-10), Figure 3 ---
+Caption (quoted in full): "Comparison of SIGNSGD on CIFAR-10. For the noisy
+algorithms we use b = 0.001. The sudden change of performance is caused by
+learning rate decay, which happens at 1000/3000/5000 iterations."
+
+This is the ONLY quantitative hyperparameter explicitly stated in text for
+the CIFAR-10 experiment:
+  - Noise scale b = 0.001 (for all "noisy" curves in this figure)
+  - Learning rate decay occurs at iterations 1000, 3000, and 5000 (implying
+    a step-decay LR schedule with decay points at those three iteration
+    counts)
+  - Figure x-axis range: 0 to ~7000 iterations (visually, ticks at 0, 2000,
+    4000, 6000)
+
+Four sub-plots in Figure 3, labeled (c), (d), (a), (b) in that left-to-right
+order as they appear on the page: (c) Training Accuracy, (d) Testing
+Accuracy, (a) Norm of Gradient, (b) Training Loss — all vs. Iteration.
+Legend entries: "hetero. w/o noise", "hetero. w/ noise", "homo. w/o noise" —
+i.e. three curves compared: SIGNSGD on heterogeneous data without noise,
+SIGNSGD on heterogeneous data WITH noise (Noisy SIGNSGD, b=0.001), and
+SIGNSGD on homogeneous data without noise (baseline for comparison).
+
+Body text results/discussion for CIFAR-10 (quoted/closely paraphrased):
+"In the second experiment (see Figure 3), we examine the performance of
+Noisy SIGNSGD on CIFAR-10. We compare SIGNSGD on both heterogeneous and
+homogeneous data, and Noisy SIGNSGD on heterogeneous data. We can see that
+when artificial noise is added to the gradients, the convergence speed of
+SIGNSGD is significantly increased. In addition, we can see that a side
+benefit of adding noise is improving generalization performance, despite all
+the algorithm achieves almost 100% training accuracy, Noisy SIGNSGD achieves
+higher testing accuracy than vanilla SIGNSGD."
+
+"It is shown that SIGNSGD on homogeneous data converges with similar speed
+of SGD in [4] while reducing 16x or 32x communication per iteration.
+Comparing convergence speed of Noisy SIGNSGD on heterogeneous data and
+SIGNSGD on homogeneous data, one can argue Noisy SIGNSGD should also be
+communication efficient when considering total communication compared with
+SGD. This set of experiments again shows that injecting noise does help in
+practice."
+
+No specific numeric accuracy values (e.g., "94.2%") are given anywhere in
+the main text for either MNIST or CIFAR-10 experiments — all accuracy/loss/
+gradient-norm results are reported ONLY as plots (Figures 2 and 3), not as
+numbers in a table. THE PAPER CONTAINS NO RESULTS TABLES — all empirical
+results are graphical only. There is no explicit statement of:
+  - model architecture (not stated in main text — e.g. no mention of ResNet,
+    CNN architecture, or layer counts for either MNIST or CIFAR-10)
+  - number of clients/workers M used in experiments
+  - learning rate value(s) (except that CIFAR-10 uses LR decay at iterations
+    1000/3000/5000; the base LR value itself is not stated)
+  - batch size (except the partially-legible "subsampling B=..." MNIST
+    legend entry, not reliably transcribable)
+  - optimizer/momentum details
+  - total number of communication rounds (only approximate iteration-axis
+    ranges visible in the figures: ~50,000 for MNIST, ~7,000 for CIFAR-10)
+  - the noise sample count "2n+1" used operationally in experiments (n is a
+    theoretical construct in Theorem 4; its experimental value is not given)
+None of these should be fabricated for YAML configs — they are genuinely
+absent from the supplied text and would need to come from Appendix I, which
+was not included in the PDF given to me.
+
+================================================================================
+6. OTHER IMPLEMENTATION-RELEVANT DETAILS
+================================================================================
+- Aggregation target: both algorithms aggregate GRADIENTS (or gradient
+  estimators g_{t,i} = grad f_i(x_t) + noise), not full local model updates/
+  weights. This is a gradient-aggregation scheme (SGD-style, synchronous,
+  one step per round), not a FedAvg-style multi-local-step weight-averaging
+  scheme. Each round: every node computes one (possibly noised) local
+  gradient estimate, sends it (or its sign, for SIGNSGD) to the server, the
+  server aggregates (coordinate-wise median, or majority vote of signs), and
+  a single global step of size delta is taken.
+- No momentum term appears anywhere in any of the four algorithm boxes
+  (Algorithms 1-4) — these are vanilla (non-momentum) SGD-style updates.
+- SIGNSGD communicates only the sign of each gradient coordinate (1 bit/
+  coordinate/node/round) — this is the source of its "communication
+  efficiency" framing (16x-32x reduction vs. plain SGD, per the homogeneous
+  MNIST comparison citing Bernstein et al. [4]).
+- MEDIANSGD communicates full (noised) gradient vectors — no compression —
+  its design motivation is Byzantine robustness via coordinate-wise median
+  (robust to outliers/extreme values), not communication efficiency. The
+  paper notes a trade-off: adding more perturbation noise b improves
+  convergence under heterogeneity but reduces Byzantine robustness, since it
+  pushes the median estimator toward behaving like a mean estimator (which
+  is NOT robust to outliers/Byzantine corruption).
+- Baselines/prior work compared against or cited for context (not necessarily
+  run as baselines in this paper's own experiments, except where noted):
+  - Bernstein et al. [4,5] — original SIGNSGD / SIGNSGD-with-majority-vote
+    papers, analyzed only under homogeneous-data / same-distribution
+    assumptions; this paper's Theorem 1 homogeneous-case bound reduces to
+    theirs.
+  - Yin et al. [28] — original MEDIANGD, Byzantine-robust, optimal
+    statistical rate, also assumed i.i.d. data across workers.
+  - Karimireddy et al. [13] — "error feedback" fix for SIGNSGD, designed for
+    single-worker (not multi-worker/heterogeneous) setting; explicitly
+    contrasted with this paper's noise-based fix (different problem setting,
+    not a head-to-head empirical comparison in this paper).
+  - Plain SGD [22] (Robbins-Monro) — cited as the baseline communication/
+    convergence-speed reference point for the homogeneous-data SIGNSGD
+    comparison on CIFAR-10 (16x/32x communication reduction claim, from
+    Bernstein et al. [4]'s result, not independently re-derived here).
+  - Alistarh et al. [2] (Byzantine SGD), Blanchard et al. [6] (Krum) — cited
+    in Related Work on Byzantine-robust optimization generally, not used as
+    empirical baselines in this paper's own experiments.
+- Noise model used in both noisy algorithms and in the theory (Theorem 4-6):
+  noise xi_{t,i} (or xi_i) must be drawn i.i.d., coordinate-wise, from a
+  distribution that is symmetric and unimodal, with mean 0 and variance 1;
+  the noise is scaled by a scalar b before being added to the raw gradient
+  (g = g_hat + b*xi). Differentiability conditions on the noise pdf (h'(z),
+  h''(z) uniformly bounded and absolutely integrable) are required for the
+  sharper theoretical results (Theorem 4b, Theorem 5, Theorem 6) but the
+  paper notes empirically that even non-smooth symmetric distributions like
+  Laplace and uniform seem to work similarly in practice (not proven,
+  observed only).
+- M (number of nodes) is required to be ODD for the median to be well
+  defined and for Proposition 1 (SIGNSGD = sign of median) to hold exactly.
+  This is a hard constraint worth preserving in any strategy implementation
+  that wants the SIGNSGD-median equivalence to be exact.
+- The paper explicitly states its scope: "the focus of this paper is NOT to
+  analyze properties of median-based methods beyond convergence" — i.e., it
+  does not re-derive or re-validate Byzantine-robustness guarantees for
+  MEDIANSGD under the noise perturbation; that trade-off is discussed only
+  qualitatively (end of Section 4).
