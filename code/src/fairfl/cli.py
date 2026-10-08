@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Annotated, Optional
 
 import typer
 
 from fairfl.config import RunConfig
+from fairfl.models.registry import list_models
+from fairfl.registry import list_strategies
 from fairfl.train.engine import RunResult, run
 
 app = typer.Typer(add_completion=False)
@@ -14,33 +17,19 @@ app = typer.Typer(add_completion=False)
 
 @app.command()
 def train(
-    num_clients: int = typer.Option(10, help="0 = centralised (no clients)"),
-    rounds: int = typer.Option(30),
-    local_epochs: int = typer.Option(5),
-    alpha: float = typer.Option(0.5, help="Dirichlet concentration"),
-    lr: float = typer.Option(0.1),
-    weight_decay: float = typer.Option(5e-4),
-    batch_size: int = typer.Option(64),
-    seed: int = typer.Option(0),
-    data_root: str = typer.Option("data"),
-    device: str = typer.Option("auto"),
-    config: str = typer.Option(None, help="YAML file; CLI flags override its values"),
-    out: str = typer.Option(None, help="write final client_acc + history JSON here"),
+    config: Annotated[Optional[str], typer.Option("--config", help="YAML base config")] = None,
+    set_: Annotated[Optional[list[str]], typer.Option("--set", help="dotted override, e.g. train.lr=0.05")] = None,
+    out: Annotated[Optional[str], typer.Option(help="write final client_acc + history JSON here")] = None,
     verbose: int = typer.Option(0, "-v", "--verbose", count=True, help="-v per-client detail too (default: per-round)"),
 ):
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=level, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
 
-    if config:
-        cfg = RunConfig.from_yaml(config)
-    else:
-        cfg = RunConfig(
-            num_clients=num_clients, rounds=rounds, local_epochs=local_epochs, alpha=alpha,
-            lr=lr, weight_decay=weight_decay, batch_size=batch_size, seed=seed, data_root=data_root, device=device,
-        )
+    cfg = RunConfig.from_yaml_and_overrides(config, set_ or [])
 
-    mode = "centralised" if cfg.is_centralised else f"federated ({cfg.num_clients} clients)"
-    typer.echo(f"[fairfl] {mode} | rounds={cfg.rounds} alpha={cfg.alpha} lr={cfg.lr}")
+    mode = "centralised" if cfg.is_centralised else f"federated ({cfg.dataset.num_clients} clients)"
+    typer.echo(f"[fairfl] {mode} | strategy={cfg.strategy.name} model={cfg.model.name} "
+               f"rounds={cfg.train.rounds} alpha={cfg.dataset.alpha} lr={cfg.train.lr}")
 
     result: RunResult | None = None
     for item in run(cfg):
@@ -60,6 +49,18 @@ def train(
         }
         Path(out).write_text(json.dumps(payload, indent=2))
         typer.echo(f"saved -> {out}")
+
+
+@app.command("strategies")
+def strategies_cmd():
+    for name in list_strategies():
+        typer.echo(name)
+
+
+@app.command("models")
+def models_cmd():
+    for name in list_models():
+        typer.echo(name)
 
 
 def main():

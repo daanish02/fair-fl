@@ -9,21 +9,35 @@ import torch
 CIFAR10_MEAN = [0.4914, 0.4822, 0.4465]
 CIFAR10_STD = [0.2470, 0.2435, 0.2616]
 
+# Proxy "sensitive attribute" for fairness-aware strategies that need a group label
+# (FairWeight, LogoFair): CIFAR10 has no real demographic attribute, so classes are
+# split into vehicle (0=airplane,1=automobile,8=ship,9=truck) vs animal (the rest).
+# This is a documented methodological limitation, not a claim about real fairness.
+VEHICLE_CLASSES = {0, 1, 8, 9}
+
+
+def group_attr(y: torch.Tensor) -> torch.Tensor:
+    vehicle = torch.zeros_like(y, dtype=torch.bool)
+    for c in VEHICLE_CLASSES:
+        vehicle |= y == c
+    return (~vehicle).long()  # 0 = vehicle, 1 = animal
+
 
 @dataclass
 class TensorDataset:
     X: torch.Tensor
     y: torch.Tensor
+    a: torch.Tensor
 
     def __len__(self) -> int:
         return len(self.y)
 
     def subset(self, idx: np.ndarray) -> "TensorDataset":
         i = torch.as_tensor(idx, dtype=torch.long)
-        return TensorDataset(self.X[i], self.y[i])
+        return TensorDataset(self.X[i], self.y[i], self.a[i])
 
     def to(self, device: torch.device | str) -> "TensorDataset":
-        return TensorDataset(self.X.to(device), self.y.to(device))
+        return TensorDataset(self.X.to(device), self.y.to(device), self.a.to(device))
 
 
 def load_cifar10(root: str | Path, split: str) -> TensorDataset:
@@ -35,7 +49,7 @@ def load_cifar10(root: str | Path, split: str) -> TensorDataset:
     s = torch.tensor(CIFAR10_STD).view(1, -1, 1, 1)
     X = (data - m) / s
     y = torch.as_tensor(ds.targets).long()
-    return TensorDataset(X.contiguous(), y)
+    return TensorDataset(X.contiguous(), y, group_attr(y))
 
 
 def random_crop_flip(X: torch.Tensor, gen: torch.Generator, pad: int = 4) -> torch.Tensor:
