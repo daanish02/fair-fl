@@ -1,0 +1,27 @@
+# Chen et al., NeurIPS 2020, Algorithm 3 (noisy signSGD, majority vote). CIFAR-10 is
+# confirmed used (Fig. 3): noise scale b=0.001, step-decay LR at iterations
+# 1000/3000/5000, extreme shard-based non-IID ("each node contains exclusive data for
+# one or two out of ten categories"). Appendix I (full experiment config) is missing
+# from the supplied PDF, so exact LR, batch size, and worker count are NOT stated in
+# the available text -- the b=0.001 noise value and the non-IID scheme ARE confirmed.
+# GAP: lr, batch_size, step are our own reasonable defaults except b. Standardised to
+# this project's shared comparison settings (10 clients, 30 rounds, 5 local epochs,
+# alpha=0.5), matching the earlier plain-FedAvg baseline run, rather than our own
+# earlier guesses. See docs/impl-papers/Distributed Training with Heterogeneous Data
+# - Bridging Median- and Mean-Based Algorithms.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.1
+  momentum: 0.9
+  batch_size: 64
+strategy:
+  name: signsgd
+  params:
+    step: 0.001
+    b: 0.001

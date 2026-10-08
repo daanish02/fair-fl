@@ -1,0 +1,31 @@
+# Wang et al., ECML-PKDD 2024. Paper's CIFAR-10 setup (Table 2/3, best hyperparams
+# alpha=0.3, r=0.6): 100 clients, 10% sampled per round, batch size 64, local
+# epochs=1, server momentum=0.5, 2000 rounds, model = MLP (1 hidden layer), 5 seeds
+# averaged. No learning rate is stated anywhere in the paper -- flagged as a gap.
+# GAP: lr is our own default; the model here is cnn_cifar not the paper's MLP, since
+# this codebase doesn't have a CIFAR MLP registered -- kept for apples-to-apples
+# comparison with the other 7 strategies instead of adding a one-off model.
+# Standardised to this project's shared comparison settings (10 clients, 30 rounds,
+# 5 local epochs, alpha=0.5), matching the earlier plain-FedAvg baseline run, instead
+# of the paper's 100 clients/10% sampled/2000 rounds. NOTE: at only 10 clients with
+# full participation (no clients_per_round set), FCFL's queue still accumulates and
+# weights aggregation, but its client-SELECTION mechanism (top-Q vs random r) barely
+# matters since nothing is excluded -- a weaker exercise of the method than the
+# paper's partial-participation setting. See docs/impl-papers/FCFL - A Fairness
+# Compensation-Based Federated Learning Scheme with Accumulated Queues.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.1
+  momentum: 0.5
+  batch_size: 64
+strategy:
+  name: fcfl
+  params:
+    eta: 0.3
+    random_fraction: 0.6

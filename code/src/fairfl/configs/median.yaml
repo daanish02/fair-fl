@@ -1,0 +1,28 @@
+# Chen et al., NeurIPS 2020 ("Distributed Training with Heterogeneous Data: Bridging
+# Median- and Mean-Based Algorithms"). CIFAR-10 is confirmed used (Fig. 3), but the
+# supplied PDF is missing Appendix I ("experiment configuration details"), so exact
+# learning rate, batch size, number of workers, and model architecture are NOT stated
+# in the available text. The paper only tests SIGNSGD empirically on CIFAR-10, not
+# MEDIANSGD ("more of theoretical interest so far") -- this config's median.sigma=0.0
+# (plain coordinate-wise median, no noise correction) since the paper gives no sigma
+# value for MEDIANSGD at all.
+# GAP: lr, batch_size are our own reasonable defaults, not paper-sourced. Standardised
+# to this project's shared comparison settings (10 clients, 30 rounds, 5 local
+# epochs, alpha=0.5), matching the earlier plain-FedAvg baseline run, rather than our
+# own earlier guesses. See docs/impl-papers/Distributed Training with Heterogeneous
+# Data - Bridging Median- and Mean-Based Algorithms.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.1
+  momentum: 0.9
+  batch_size: 64
+strategy:
+  name: median
+  params:
+    sigma: 0.0

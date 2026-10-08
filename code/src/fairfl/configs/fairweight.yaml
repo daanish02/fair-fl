@@ -1,0 +1,39 @@
+# Kasyap, Atmaca, Maple, Lane, IEEE TSC 2026. CONFIRMED: this paper reports ZERO
+# image-classification experiments -- all five datasets (Adult, Bank, Default, Law,
+# KDD) are tabular, binary-classification, with a REAL protected attribute
+# (sex/race/age/marital status/education). Numbers produced by this codebase's
+# CIFAR-10 + synthetic vehicle-vs-animal proxy attribute are therefore not a
+# reproduction of this paper's results -- they only exercise the same code path.
+# Document this explicitly as a limitation wherever these numbers are used.
+# Paper's confirmed hyperparameters (its own tabular setting): 3 clients, 50 global
+# rounds, 15 local rounds, lr=0.001, regularisation constant zeta=100 (closest
+# analogue to our fair_weight), top-10%-of-weights flagged as bias-responsible
+# (5/10/15/20/25% swept in Table VI), beta1=beta2=1 initial (tuned via Algorithm 3 --
+# our code treats gamma1/gamma2 as fixed, not adaptive, a further simplification).
+# "repeats" and the exact k (num weights sampled) have no stated numeric value in
+# the paper -- kept at this code's own default (5) as a GAP, not a paper value.
+# Standardised to this project's shared comparison settings (10 clients, 30 rounds,
+# 5 local epochs, alpha=0.5), matching the earlier plain-FedAvg baseline run, instead
+# of the paper's own tabular setting (3 clients, 50 rounds, 15 local epochs).
+# See docs/impl-papers/FairWeight - Private Fairness-aware Aggregation using Model
+# Interpretation based Weightage in Federated Learning.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.001
+  momentum: 0.9
+  batch_size: 64
+strategy:
+  name: fairweight
+  params:
+    gamma1: 1.0
+    gamma2: 1.0
+    top_fraction: 0.1
+    fair_weight: 100.0
+    repeats: 5
+    max_samples: 400

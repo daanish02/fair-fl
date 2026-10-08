@@ -1,0 +1,40 @@
+# Ling et al., ACNS 2026 (arXiv 2402.16028). CIFAR-10 confirmed used (Tables 2-5),
+# model = 4-layer CNN (2 conv + 2 FC, no ResNet in the paper at all). Default
+# FedFDP params (Section 7.1): lambda(eta)=1.0, q=0.05, C=0.1, sigma=2.0,
+# epsilon=3.52, delta=1e-5, loss_clip_init=2.5, sigma_loss=5.0. 10 clients default
+# (20/50 tested only for CIFAR-10 scalability ablation), Dirichlet beta=0.1 default.
+# GAP: the paper never states a fixed round count T for its main Table 2/3 results
+# (only a sigma-sweep T in {6,115,268,463,708} at fixed epsilon=2). Also:
+# "dp_steps"/"loss_clip_init" are not terms the paper uses, and C_l's round-0 seed
+# value is unspecified in the paper (Eq 14 is recursive) -- our loss_clip_init=2.5
+# matches the paper's one explicit default. Standardised to this project's shared
+# comparison settings (30 rounds, 5 local epochs, alpha=0.5 Dirichlet, matching the
+# earlier plain-FedAvg baseline run) instead of our own earlier 200-round/alpha=0.1
+# guess; num_clients=10 already matched the paper's default. NOTE: with
+# sampling=poisson (the paper's own default), local_epochs is not actually consumed
+# by FedFDPClient.fit -- it draws one Poisson-sampled batch per round and takes
+# dp_steps DP-SGD steps on it, so local_epochs=5 here has no effect under poisson
+# sampling; it would only matter if sampling were switched to "batches".
+# See docs/impl-papers/Fedfdp.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.1
+  momentum: 0.9
+  batch_size: 64
+strategy:
+  name: fedfdp
+  params:
+    lam: 1.0
+    clip: 0.1
+    sigma: 2.0
+    sigma_loss: 5.0
+    loss_clip_init: 2.5
+    sampling: poisson
+    q: 0.05
+    dp_steps: 1

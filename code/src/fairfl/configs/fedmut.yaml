@@ -1,0 +1,36 @@
+# Hu et al., AAAI 2024. CIFAR-10 settings confirmed from paper text: SGD lr=0.01,
+# momentum=0.9 (paper text says 0.9 explicitly; an earlier archive note claimed the
+# official code uses 0.5 -- UNVERIFIED here, paper text wins), batch=50, local
+# epochs=5, Dirichlet d in {0.1, 0.5, 1.0} (paper's own notation, not "alpha"/"beta").
+# alpha(radius)=4.0 confirmed for all cases. mut_acc_rate(beta_0)=0.3 for CNN/VGG,
+# 0.5 for ResNet-18 -- confirmed exactly; this config uses cnn_cifar so 0.3 applies.
+# mut_bound (T_b numeric value) and num_clients/participation-rate are NOT stated in
+# the paper text (only inferable from a 0-1000 round axis on a figure) -- GAP, using
+# archive's unverified "100 clients, 10%/round, 1000 rounds, mut_bound=50" guess.
+# Standardised to this project's shared comparison settings (10 clients, full
+# participation, 30 rounds, 5 local epochs, alpha=0.5), matching the earlier
+# plain-FedAvg baseline run, instead of the paper-inferred 100/10%/1000. Mutation
+# pairing (m clients -> m/2 sign pairs) still works correctly at 10 clients. NOTE:
+# mut_bound=50 > 30 total rounds means the acceleration/asymmetry never fully decays
+# to 0 within this run (mutation stays slightly asymmetric throughout) -- a milder
+# version of the same "warmup longer than the run" issue as FedCDA.
+# See docs/impl-papers/FedMut - Generalized Federated Learning via Stochastic
+# Mutation.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.01
+  momentum: 0.9
+  batch_size: 50
+strategy:
+  name: fedmut
+  params:
+    radius: 4.0
+    mut_acc_rate: 0.3
+    mut_bound: 50
+    weighted: false

@@ -1,0 +1,32 @@
+# Augello, Gupta, Lo Re, Das, IEEE TETC 2026. CIFAR-10 settings confirmed: 50
+# clients, up to 30% selfish, 30 communication rounds, 5 local epochs, SGD, batch
+# size 256, lr 0.1, CNN (3 conv + 2 FC). tau=2.5 (detection threshold). The paper's
+# fairness-exponent parameter (called "phi" in our extraction, q in our code) was
+# swept {0,0.2,...,1} and fixed at 0.7 for the main comparison table.
+# Standardised to this project's shared comparison settings (10 clients, alpha=0.5
+# Dirichlet, matching the earlier plain-FedAvg baseline run) instead of the paper's
+# 50 clients / "2 classes/client" shard-based partition (this engine only supports
+# Dirichlet partitioning anyway, so that scheme was always a proxy, not exact).
+# Rounds=30 and local_epochs=5 happen to already match the paper's own values.
+# NOTE: no selfish/malicious client simulation exists in this port (RFL-Self and
+# Dq-FFL math are both ported, but the engine never injects adversarial updates) --
+# running this config tests the fairness-weighting behavior only, not robustness.
+# See docs/impl-papers/FairRFL Fair and Robust Federated Learning in the Presence of
+# Selfish Clients.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.1
+  momentum: 0.9
+  batch_size: 64
+strategy:
+  name: fairrfl
+  params:
+    tau: 2.5
+    q: 0.7
+    use_dqffl: true

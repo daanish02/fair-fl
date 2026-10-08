@@ -1,0 +1,43 @@
+# Zhang et al., AAAI 2025. CONFIRMED: this paper never uses CIFAR-10 -- its three
+# datasets are Adult (tabular), ENEM (tabular), and CelebA-Spoof (image, but used
+# purely for its demographic annotation in binary classification, not as a generic
+# 10-class object benchmark). Numbers produced by this codebase's CIFAR-10 +
+# synthetic vehicle-vs-animal proxy attribute + binarized class-0-vs-rest label are
+# therefore not a reproduction of this paper's results -- document as a limitation.
+# Confirmed hyperparameters (main Table 1 setting): 5 clients, delta_l=delta_g=0.01,
+# converges within 10 communication rounds (stated explicitly in main text, not
+# appendix-only). This config uses post_rounds=40 (our own default, more than
+# enough margin over the paper's confirmed ~10-round convergence).
+# GAP: beta (smoothing sharpness), lr/inner_lr/inner_steps, and base-model
+# architecture are all deferred to Appendix D in the paper, which is NOT included in
+# the supplied PDF -- these remain this code's own defaults, not paper-sourced.
+# Standardised to this project's shared comparison settings (10 clients, 30 rounds,
+# 5 local epochs, alpha=0.5), matching the earlier plain-FedAvg baseline run, instead
+# of the paper's own 5-client setting; post_rounds=40 for the postprocess phase is
+# well past the paper's confirmed ~10-round convergence either way.
+# See docs/impl-papers/Logofair.txt.
+dataset:
+  num_clients: 10
+  alpha: 0.5
+model:
+  name: resnet18
+train:
+  rounds: 30
+  local_epochs: 5
+  lr: 0.1
+  momentum: 0.9
+  batch_size: 64
+strategy:
+  name: logofair
+  params:
+    mode: lg
+    metric: dp
+    delta_l: 0.01
+    delta_g: 0.01
+    beta: 2000.0
+    post_rounds: 40
+    lr: 8.0
+    inner_steps: 100
+    inner_lr: 0.5
+    calibrate: true
+    min_group_count: 20
